@@ -36,7 +36,7 @@ test("an unsettled batch is offered again, ahead of newer events", () => {
 test("a partly sent batch resumes after the last handled event", () => {
   const buffer = open(tmpDir());
   for (const n of ["a", "b", "c", "d"]) buffer.append(event(n));
-  buffer.claim()[0].settle({ sent: 3 });
+  buffer.claim()[0].settle({ handled: 3 });
   assert.deepEqual(names(buffer.claim()), ["d"]);
 });
 
@@ -132,4 +132,13 @@ test("dead/ is capped too", () => {
   assert.equal(dead.includes("one-"), false);
   assert.equal(dead.includes("three-"), true);
   assert.ok(buffer);
+});
+
+test("unreadable batches count against the dead/ cap too", () => {
+  const dir = tmpDir();
+  fs.mkdirSync(path.join(dir, "dead"));
+  fs.writeFileSync(path.join(dir, "dead", "rejected-0-old.jsonl"), "x".repeat(500));
+  fs.mkdirSync(path.join(dir, "batch-0000000000000-1-000000.jsonl"));
+  open(dir, { maxDeadBytes: 100 }).claim();
+  assert.deepEqual(fs.readdirSync(path.join(dir, "dead")), ["batch-0000000000000-1-000000.jsonl"]);
 });

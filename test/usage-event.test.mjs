@@ -104,3 +104,16 @@ test("no payload content ever reaches the event, whatever the hook sends", () =>
   for (const leaked of ["acme", "transcript", "SECRET", "/secret"]) assert.ok(!line.includes(leaked), `leaked ${leaked}`);
   assert.deepEqual(Object.keys(event).sort(), ["kind", "name", "project", "session_id", "source", "sub", "ts", "user"]);
 });
+
+test("an empty subagent type is left out rather than recorded as unknown", () => {
+  assert.equal("subagent" in toEvent(tool("Read", {}, { agent_type: "" }), context, at), false);
+});
+
+test("session context is only looked up for payloads that produce an event", () => {
+  let lookups = 0;
+  const lookup = () => (lookups++, context);
+  assert.equal(toEvent({ ...base, hook_event_name: "Stop" }, lookup, at), null);
+  assert.equal(lookups, 0);
+  assert.equal(toEvent(tool("Read"), lookup, at).user, "dev@example.com");
+  assert.equal(lookups, 1);
+});

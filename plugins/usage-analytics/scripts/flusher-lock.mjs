@@ -2,6 +2,7 @@
 // heartbeat; the single place that knows what "a flusher is alive" means.
 import fs from "node:fs";
 import path from "node:path";
+import { describe } from "./log.mjs";
 
 // The holder touches the lock on every stillMine(); a lock older than this is
 // dead whatever its pid says (covers pid reuse after a crash or reboot).
@@ -56,7 +57,7 @@ export function acquire(dir, { staleMs = DEFAULT_STALE_MS, log = () => {} } = {}
         return handle(file);
       } catch (err) {
         if (err?.code !== "EEXIST") {
-          log(`cannot create lock: ${err?.code || err?.message}`);
+          log(`cannot create lock: ${describe(err)}`);
           return null;
         }
       }
@@ -71,7 +72,7 @@ export function acquire(dir, { staleMs = DEFAULT_STALE_MS, log = () => {} } = {}
     log("could not acquire lock after 3 attempts");
     return null;
   } catch (err) {
-    log(`lock error: ${err?.code || err?.message}`);
+    log(`lock error: ${describe(err)}`);
     return null;
   } finally {
     fs.rmSync(tmp, { force: true });

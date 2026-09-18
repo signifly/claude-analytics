@@ -1,5 +1,6 @@
 // Loki adapter for the flusher's sink seam: push(events) → "ok" | "rejected",
 // throws when a retry makes sense.
+import { describe } from "./log.mjs";
 import { LABELS } from "./usage-event.mjs";
 
 export const SERVICE_NAME = "claude-code-usage";
@@ -7,11 +8,6 @@ export const SERVICE_NAME = "claude-code-usage";
 // Loki will never accept these as sent; everything else may succeed later.
 const REJECTED = new Set([400, 413, 422]);
 const MISCONFIGURED = new Set([401, 403, 404, 407]);
-
-function describe(err) {
-  const cause = err?.cause?.code || err?.cause?.errors?.[0]?.code || err?.cause?.message;
-  return [err?.message, cause].filter(Boolean).join(": ");
-}
 
 export function createLokiSink({ url, token, basicAuth, tenant, fetch = globalThis.fetch, log = () => {} }) {
   const endpoint = `${String(url).replace(/\/+$/, "")}/loki/api/v1/push`;

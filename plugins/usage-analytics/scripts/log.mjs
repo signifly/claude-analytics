@@ -7,6 +7,12 @@ import path from "node:path";
 const MAX_LOG_BYTES = 1024 * 1024;
 const ONCE_MS = 60 * 60 * 1000;
 
+// One line for any error: its message plus the code or cause that explains it.
+export function describe(err) {
+  const cause = err?.cause?.code || err?.cause?.errors?.[0]?.code || err?.cause?.message;
+  return [err?.code && !String(err?.message).includes(err.code) ? err.code : "", err?.message ?? String(err), cause].filter(Boolean).join(": ");
+}
+
 export function createLog(dir) {
   const file = path.join(dir, "flusher.log");
 

@@ -3,6 +3,7 @@
 // See docs/architecture-decisions/0002-append-only-file-buffer.mdx.
 import fs from "node:fs";
 import path from "node:path";
+import { describe } from "./log.mjs";
 
 const DEFAULTS = {
   maxBacklogBytes: 50 * 1024 * 1024,
@@ -28,6 +29,13 @@ export function openBuffer(dir, options = {}) {
       return 0;
     }
   };
+  const mtime = (file) => {
+    try {
+      return fs.statSync(file).mtimeMs;
+    } catch {
+      return 0;
+    }
+  };
   const list = (folder, pattern) => {
     try {
       return fs.readdirSync(folder).filter((f) => pattern.test(f)).sort().map((f) => path.join(folder, f));
@@ -37,14 +45,30 @@ export function openBuffer(dir, options = {}) {
   };
   const toLines = (events) => events.map((e) => JSON.stringify(e) + "\n").join("");
 
-  function writeDead(name, content) {
-    fs.mkdirSync(deadDir, { recursive: true });
-    fs.writeFileSync(path.join(deadDir, name), content);
-    evictOldest(deadDir, /./, maxDeadBytes, "dead/");
+  // Everything that enters dead/ comes through here: written whole, then capped.
+  // `source` is a file to move in, or the content for a new file.
+  function toDead(name, { file, content }) {
+    const target = path.join(deadDir, name);
+    try {
+      fs.mkdirSync(deadDir, { recursive: true });
+      if (file) fs.renameSync(file, target);
+      else {
+        fs.writeFileSync(`${target}.tmp`, content);
+        fs.renameSync(`${target}.tmp`, target);
+      }
+    } catch (err) {
+      // dead/ is a courtesy; failing to fill it must never block the batches behind.
+      log(`cannot keep ${name} in dead/ (${describe(err)}), discarding it`);
+      if (file) fs.rmSync(file, { force: true, recursive: true });
+    }
+    evictOldest(deadDir, /./, maxDeadBytes, "dead/", { byMtime: true });
   }
 
-  function evictOldest(folder, pattern, maxBytes, what) {
-    const files = list(folder, pattern).map((file) => ({ file, bytes: size(file) }));
+  // Batch names carry their claim time, so name order is age order. dead/ mixes
+  // name shapes, so there age means modification time.
+  function evictOldest(folder, pattern, maxBytes, what, { byMtime = false } = {}) {
+    const files = list(folder, pattern).map((file) => ({ file, bytes: size(file), mtime: mtime(file) }));
+    if (byMtime) files.sort((a, b) => a.mtime - b.mtime);
     let total = files.reduce((sum, f) => sum + f.bytes, 0);
     // Never the newest: a live file that filled up to the cap is claimed as one
     // batch slightly over it, and must not be thrown away whole.
@@ -64,9 +88,8 @@ export function openBuffer(dir, options = {}) {
     } catch (err) {
       if (err?.code === "ENOENT") return null;
       // An unreadable batch must not block the ones behind it.
-      log(`quarantined ${name} in dead/: unreadable (${err?.code || err?.message})`);
-      fs.mkdirSync(deadDir, { recursive: true });
-      fs.renameSync(file, path.join(deadDir, name));
+      log(`moved ${name} to dead/: unreadable (${describe(err)})`);
+      toDead(name, { file });
       return null;
     }
 
@@ -90,20 +113,20 @@ export function openBuffer(dir, options = {}) {
     return {
       name,
       events,
-      // `sent` leading events were handled (delivered, or listed in `rejected`);
-      // the rest stay held for a later claim.
-      settle({ sent = events.length, rejected = [] } = {}) {
+      // The first `handled` events are done with (delivered, or listed in
+      // `rejected`); the rest stay held for a later claim.
+      settle({ handled = events.length, rejected = [] } = {}) {
         if (rejected.length) {
-          writeDead(`rejected-${now()}-${name}`, toLines(rejected));
+          toDead(`rejected-${now()}-${name}`, { content: toLines(rejected) });
           log(`${name}: ${rejected.length} rejected events kept in dead/`);
         }
         // A writer that opened the live file before the claim may have
-        // appended after we read it: that tail is still unsent.
+        // appended after we read it: that tail is held too.
         let tail = Buffer.alloc(0);
         try {
           tail = fs.readFileSync(file).subarray(raw.length);
         } catch {}
-        const held = toLines(events.slice(sent));
+        const held = toLines(events.slice(handled));
         if (!held && !tail.length) return fs.rmSync(file, { force: true });
         const tmp = `${file}.tmp`;
         fs.writeFileSync(tmp, Buffer.concat([Buffer.from(held), tail]));
@@ -132,7 +155,7 @@ export function openBuffer(dir, options = {}) {
         try {
           fs.renameSync(liveFile, path.join(dir, `batch-${now()}-${process.pid}-${String(claims++).padStart(6, "0")}.jsonl`));
         } catch (err) {
-          if (err?.code !== "ENOENT") log(`cannot claim buffer: ${err?.code || err?.message}`);
+          if (err?.code !== "ENOENT") log(`cannot claim buffer: ${describe(err)}`);
         }
       }
       evictOldest(dir, BATCH, maxBacklogBytes, "backlog");

@@ -85,3 +85,8 @@ test("credentials and tenant are sent as headers; a token wins over basic auth",
   await createLokiSink({ url: "http://l", basicAuth: "u:p", fetch: basic.fetch }).push([event()]);
   assert.equal(basic.requests[0].headers.Authorization, "Basic dTpw");
 });
+
+test("a request that times out is retryable", async () => {
+  const fetch = async () => { throw new DOMException("The operation was aborted due to timeout", "TimeoutError"); };
+  await assert.rejects(createLokiSink({ url: "http://loki:3100", fetch }).push([event()]), /aborted due to timeout/);
+});

@@ -5,6 +5,7 @@
 export const LABELS = ["user", "project", "source", "kind"];
 
 // The only fields an event may carry, and which of them hold identifiers.
+// (`ts` + `sub` together are the timestamp: milliseconds plus random sub-millisecond digits.)
 const FIELDS = ["ts", "sub", "kind", "name", "mcp_server", "user", "project", "source", "session_id", "subagent"];
 const IDENTIFIERS = new Set(["kind", "name", "mcp_server", "subagent"]);
 
@@ -31,10 +32,13 @@ function classify(payload) {
   return { kind: "tool", name: tool };
 }
 
+// `context` is the session context, or a function returning it: the lookup can
+// cost git subprocesses, so it only happens for payloads that produce an event.
 export function toEvent(payload, context, { now = Date.now(), sub = Math.floor(Math.random() * 1e6) } = {}) {
   const classified = classify(payload);
   if (!classified) return null;
-  const draft = { ts: now, sub, ...classified, ...context, session_id: payload.session_id, subagent: payload.agent_type };
+  const resolved = typeof context === "function" ? context() : context;
+  const draft = { ts: now, sub, ...classified, ...resolved, session_id: payload.session_id, subagent: payload.agent_type || undefined };
   // The allow-list is the last step: a branch above cannot leak a field it was never allowed to emit.
   const event = {};
   for (const field of FIELDS) {

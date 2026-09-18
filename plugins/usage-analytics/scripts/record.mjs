@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.mjs";
 import { openBuffer } from "./event-buffer.mjs";
 import { isHeld } from "./flusher-lock.mjs";
-import { createLog } from "./log.mjs";
+import { createLog, describe } from "./log.mjs";
 import { sessionContext } from "./session-context.mjs";
 import { toEvent } from "./usage-event.mjs";
 
@@ -24,7 +24,7 @@ function startFlusher() {
   } catch {}
   const child = spawn(process.execPath, [flusher], { detached: true, stdio: ["ignore", "ignore", stderr] });
   // Spawn failures are asynchronous: without this they'd crash the hook.
-  child.on("error", (err) => log(`flusher spawn failed: ${err?.code || err?.message}`));
+  child.on("error", (err) => log(`flusher spawn failed: ${describe(err)}`));
   child.unref();
 }
 
@@ -38,11 +38,11 @@ function main() {
   }
 
   const dir = config.dataDir;
-  const context = sessionContext({ dir, sessionId: payload.session_id, cwd: payload.cwd, config, logOnce });
+  const context = () => sessionContext({ dir, sessionId: payload.session_id, cwd: payload.cwd, config, logOnce });
   const event = toEvent(payload, context);
   if (!event) return;
 
-  if (!openBuffer(dir, { log }).append(event)) logOnce("buffer-full", "buffer is full, dropping events until it drains");
+  if (!openBuffer(dir, { log }).append(event)) logOnce("buffer-full", "live file is over its size cap, refusing new events until the flusher claims it");
   if (!isHeld(dir)) startFlusher();
 }
 
@@ -50,5 +50,5 @@ try {
   main();
 } catch (err) {
   // Analytics must never surface errors into a session; leave a trace instead.
-  log(`record failed: ${err?.code || err?.message}`);
+  log(`record failed: ${describe(err)}`);
 }

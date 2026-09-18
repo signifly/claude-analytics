@@ -1,48 +1,21 @@
 #!/usr/bin/env node
-// Flusher entry point: one per data dir. Moves events from the buffer to Loki
-// about once a second, backs off while Loki is failing, exits when idle.
+// Flusher entry point: one per data dir. Takes the flusher lock, drains the
+// event buffer into Loki until idle, and makes sure nothing is stranded on exit.
 // Spawned on demand by record.mjs; inherits the Loki settings of that session.
 import { loadConfig } from "./config.mjs";
 import { openBuffer } from "./event-buffer.mjs";
-import { flushOnce } from "./flush-once.mjs";
+import { drain } from "./drain.mjs";
 import { acquire } from "./flusher-lock.mjs";
 import { createLog } from "./log.mjs";
 import { createLokiSink } from "./loki-sink.mjs";
 import { pruneSessions } from "./session-context.mjs";
 
-const MAX_BACKOFF_MS = 60 * 1000;
 const SESSION_CACHE_MS = 6 * 24 * 60 * 60 * 1000;
 
 const config = loadConfig();
 const { log } = createLog(config.dataDir);
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let lock = null;
-
-// Runs until idle (true) or until the lock is lost to another flusher (false).
-async function drain(buffer, sink) {
-  let lastActivity = Date.now();
-  let backoff = 0;
-  while (Date.now() - lastActivity < config.idleExitMs) {
-    await sleep(backoff || config.flushMs);
-    if (!lock.stillMine()) return log("lock lost to another flusher, exiting"), false;
-
-    // Only new events or a delivery count as activity, so an unreachable Loki
-    // doesn't keep this process alive forever.
-    if (buffer.pending()) lastActivity = Date.now();
-    const { delivered, error } = await flushOnce(buffer, sink);
-    if (delivered) lastActivity = Date.now();
-
-    if (error) {
-      backoff = Math.min(MAX_BACKOFF_MS, (backoff || config.flushMs) * 2);
-      log(`push failed, retry in ${backoff}ms: ${error.message}`);
-    } else {
-      if (backoff) log("push recovered");
-      backoff = 0;
-    }
-  }
-  return true;
-}
 
 async function main() {
   for (const warning of config.warnings) log(warning);
@@ -53,7 +26,7 @@ async function main() {
   while ((lock = acquire(dir, { log }))) {
     log(`flusher started -> ${config.loki.url}`);
     pruneSessions(dir, SESSION_CACHE_MS, log);
-    const idle = await drain(buffer, sink);
+    const idle = await drain({ buffer, sink, lock, flushMs: config.flushMs, idleExitMs: config.idleExitMs, log });
     lock.release();
     if (!idle) return;
     // An event appended between the last flush and the release saw a live

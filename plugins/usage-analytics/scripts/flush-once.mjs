@@ -19,7 +19,7 @@ function chunk(events, maxBytes) {
   return chunks;
 }
 
-// Never throws. On a retryable failure everything unsent stays held, in order,
+// Never throws. On a retryable failure everything not yet handled stays held, in order,
 // and `error` says why; the caller decides when to try again.
 export async function flushOnce(buffer, sink, { maxPushBytes = DEFAULT_MAX_PUSH_BYTES } = {}) {
   const result = { delivered: 0, rejected: 0, error: null };
@@ -34,7 +34,7 @@ export async function flushOnce(buffer, sink, { maxPushBytes = DEFAULT_MAX_PUSH_
 async function pushAll(buffer, sink, maxPushBytes, result) {
   for (const batch of buffer.claim()) {
     const rejected = [];
-    let sent = 0;
+    let handled = 0;
     for (const events of chunk(batch.events, maxPushBytes)) {
       try {
         if ((await sink.push(events)) === "rejected") rejected.push(...events);
@@ -43,10 +43,10 @@ async function pushAll(buffer, sink, maxPushBytes, result) {
         result.error = err;
         break;
       }
-      sent += events.length;
+      handled += events.length;
     }
     result.rejected += rejected.length;
-    batch.settle({ sent, rejected });
+    batch.settle({ handled, rejected });
     if (result.error) break; // keep order: don't send newer batches past a held one
   }
 }
