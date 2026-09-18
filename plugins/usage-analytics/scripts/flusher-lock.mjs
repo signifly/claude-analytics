@@ -138,3 +138,18 @@ function handle(file, log) {
     },
   };
 }
+
+// Throttle for whoever starts flushers: true at most once per interval. A
+// flusher that dies at startup (bad install, broken lock) would otherwise be
+// respawned on every hook event. Errs towards allowing.
+export function spawnAllowed(dir, { minIntervalMs = 5000 } = {}) {
+  const marker = path.join(dir, ".flusher-spawned");
+  try {
+    if (Date.now() - fs.statSync(marker).mtimeMs < minIntervalMs) return false;
+  } catch {}
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(marker, "");
+  } catch {}
+  return true;
+}

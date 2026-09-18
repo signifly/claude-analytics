@@ -18,13 +18,13 @@ const { log } = createLog(config.dataDir);
 let lock = null;
 
 async function main() {
-  for (const warning of config.warnings) log(warning);
   const dir = config.dataDir;
   const buffer = openBuffer(dir, { log });
   const sink = createLokiSink({ ...config.loki, log });
 
   while ((lock = acquire(dir, { log }))) {
     log(`flusher started -> ${config.loki.url}`);
+    for (const warning of config.warnings.splice(0)) log(warning);
     pruneSessions(dir, SESSION_CACHE_MS, log);
     const idle = await drain({ buffer, sink, lock, flushMs: config.flushMs, idleExitMs: config.idleExitMs, log });
     lock.release();

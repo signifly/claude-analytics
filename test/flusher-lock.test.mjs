@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { acquire, isHeld } from "../plugins/usage-analytics/scripts/flusher-lock.mjs";
+import { acquire, isHeld, spawnAllowed } from "../plugins/usage-analytics/scripts/flusher-lock.mjs";
 
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "flusher-lock-"));
 const pidFile = (dir) => path.join(dir, "flusher.pid");
@@ -124,4 +124,19 @@ test("a data dir that does not exist yet can be locked, leaving nothing else beh
   const lock = acquire(dir);
   assert.deepEqual(fs.readdirSync(dir), ["flusher.pid"]);
   lock.release();
+});
+
+test("starting a flusher is allowed at most once per interval, so one that dies at startup is not respawned on every hook event", () => {
+  const dir = tmpDir();
+  assert.equal(spawnAllowed(dir, { minIntervalMs: 5000 }), true);
+  assert.equal(spawnAllowed(dir, { minIntervalMs: 5000 }), false);
+  assert.equal(spawnAllowed(dir, { minIntervalMs: 5000 }), false);
+  fs.utimesSync(path.join(dir, ".flusher-spawned"), longAgo, longAgo);
+  assert.equal(spawnAllowed(dir, { minIntervalMs: 5000 }), true);
+});
+
+test("if the throttle marker cannot be written, starting a flusher is still allowed", () => {
+  const blocked = path.join(tmpDir(), "a-file");
+  fs.writeFileSync(blocked, "");
+  assert.equal(spawnAllowed(path.join(blocked, "analytics")), true);
 });
