@@ -138,6 +138,8 @@ test("unreadable batches count against the dead/ cap too", () => {
   const dir = tmpDir();
   fs.mkdirSync(path.join(dir, "dead"));
   fs.writeFileSync(path.join(dir, "dead", "rejected-0-old.jsonl"), "x".repeat(500));
+  const lastWeek = new Date(Date.now() - 7 * DAY);
+  fs.utimesSync(path.join(dir, "dead", "rejected-0-old.jsonl"), lastWeek, lastWeek);
   fs.mkdirSync(path.join(dir, "batch-0000000000000-1-000000.jsonl"));
   open(dir, { maxDeadBytes: 100 }).claim();
   assert.deepEqual(fs.readdirSync(path.join(dir, "dead")), ["batch-0000000000000-1-000000.jsonl"]);
