@@ -1,0 +1,55 @@
+---
+title: ✅ Record names, never content
+description: A usage event carries the bare name of what was used plus who and where; prompt text, arguments, tool inputs, outputs and paths are never recorded.
+---
+
+# 0003. Record names, never content
+
+Date: 2026-09-18
+Author: Emil Hørlyck
+
+## Status
+
+Accepted
+
+## Context
+
+Hook payloads contain everything: prompts, shell commands, file paths, tool output. The analytics question is only
+"what gets used, by whom". Rolling this out to colleagues, and later enforcing it through managed settings, depends
+on being able to state plainly what leaves their machine. An early version recorded the working directory and could
+record slash-command arguments through the `Skill` tool's input; both were review findings.
+
+## Decision
+
+A usage event contains only: timestamp, kind, name, identity tag, project name, source, session id, and where
+present subagent type and MCP server. Every name is reduced to a bare identifier (first token, `[\w:.-]`, max 100
+characters, otherwise `unknown`).
+
+The rule is enforced in one place, as an allow-list applied when the event is built, not as an obligation on each
+branch that classifies a payload. Table tests pin it.
+
+## Consequences
+
+### Positive Consequences
+
+- One sentence describes what is recorded, and one function proves it.
+- Loki's open query access is lower risk: there is no content to leak.
+- Names stay low-variety, which keeps dashboard grouping meaningful.
+
+### Negative Consequences
+
+- No "what were people trying to do" analysis; arguments and prompts are gone for good.
+- Skills invoked with a malformed name collapse into `unknown`.
+- The identity tag defaults to the git email, which is personal data; teams that object need
+  `CLAUDE_ANALYTICS_USER` set to a handle.
+
+## Alternatives Considered
+
+### Record arguments behind an opt-in flag
+
+**Rejected because**: the promise stops being unconditional, and one misconfigured repo would put client text into
+a shared store with 90-day retention.
+
+### Hash content instead of dropping it
+
+**Rejected because**: short prompts and paths are guessable from a hash, and nothing on the roadmap needs it.

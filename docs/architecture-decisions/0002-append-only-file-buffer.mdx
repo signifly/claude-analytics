@@ -1,0 +1,56 @@
+---
+title: ✅ Append-only file as the event buffer
+description: Concurrent sessions share one append-only JSONL file, claimed by rename, instead of SQLite or a local broker.
+---
+
+# 0002. Append-only file as the event buffer
+
+Date: 2026-09-18
+Author: Emil Hørlyck
+
+## Status
+
+Accepted
+
+## Context
+
+Several writers can run on one machine at once: a developer session, its subagents, and other sessions. They all
+need to hand usage events to a single flusher without corrupting each other's entries, and without the hook doing
+anything slower than a file write. Events are small (a few hundred bytes) and arrive at human speed.
+
+## Decision
+
+Hooks append one complete JSON line per event to `events.jsonl`, opened in append mode, in a single write. The
+flusher claims the file by renaming it to `batch-<time>-<pid>.jsonl`; writers reopen the path for every event, so
+new events land in a fresh file. One flusher per data dir is enforced with a pid file and heartbeat.
+
+The buffer is bounded (50 MB backlog, 20 MB dead folder) and torn lines are skipped and counted.
+
+## Consequences
+
+### Positive Consequences
+
+- No dependencies and no long-lived process required for capture.
+- Small single appends don't interleave on local filesystems, so writers need no lock.
+- Rename is atomic, so writers and the flusher never contend for the same file.
+- The buffer is plain text: inspectable and recoverable by hand.
+
+### Negative Consequences
+
+- Append atomicity is not guaranteed on network filesystems or some container bind mounts, so a buffer must not be
+  shared across machines or containers. Each container runs its own.
+- A writer that stalls between open and write can append to an already-claimed batch; the buffer has to preserve
+  that late tail.
+- The pid-based lock does not work across pid namespaces, for the same reason.
+
+## Alternatives Considered
+
+### SQLite queue
+
+**Rejected because**: adds a native dependency to every machine and container for a volume a text file handles.
+Revisit if payloads grow or writes stop being single-shot.
+
+### Local broker process owning all writes
+
+**Rejected because**: one more long-lived process to install and keep alive on every machine, and capture would
+fail whenever it is down.

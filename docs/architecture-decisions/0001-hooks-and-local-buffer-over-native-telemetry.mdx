@@ -1,0 +1,62 @@
+---
+title: ✅ Hooks and a local buffer over native telemetry only
+description: Usage events are captured by Claude Code hooks and shipped by our own flusher, rather than relying solely on Claude Code's built-in OpenTelemetry export.
+---
+
+# 0001. Hooks and a local buffer over native telemetry only
+
+Date: 2026-09-18
+Author: Emil Hørlyck
+
+## Status
+
+Accepted
+
+## Context
+
+We want to know which skills, slash commands, tools and subagents get used, by whom, across developer sessions and
+autonomous Sandcastle agents. Claude Code can export OpenTelemetry metrics and events natively, and it offers hooks
+that run a command on session, prompt and tool events.
+
+Forces:
+
+- Analytics must never slow down or disturb a session.
+- We need an identity tag for autonomous agents, which have no account email of their own.
+- We need control over exactly what is recorded, so we can promise the team that content never leaves the machine.
+- The configuration has to be distributable to every developer and agent from one place.
+
+## Decision
+
+Capture usage events with a Claude Code plugin that registers async `SessionStart`, `UserPromptSubmit` and
+`PostToolUse` hooks. The hook appends one line to a local buffer and does no network I/O. A separate flusher process
+batches the buffer to Loki.
+
+The stack still runs an OTel collector, so native telemetry (tokens, cost) can be switched on alongside the hooks
+without new infrastructure.
+
+## Consequences
+
+### Positive Consequences
+
+- We decide the event shape, so the names-only rule ([0003](0003-record-names-never-content.mdx)) is enforceable in our code.
+- Identity is one environment variable that works the same for people and agents.
+- Hooks are async and local: a slow or unreachable Loki cannot affect a session.
+- Distribution is a plugin marketplace; rollout can move from opt-in to managed settings without code changes.
+
+### Negative Consequences
+
+- We own a buffer, a lock and a retry loop that native export would give us for free.
+- Requires `node` on the PATH hooks run with.
+- Slash commands and Claude-invoked skills arrive through different hooks and have to be counted together.
+
+## Alternatives Considered
+
+### Native OpenTelemetry export only
+
+**Rejected because**: no way to tag Sandcastle agents with our own identity, no control over which attributes are
+recorded, and skill/command names depend on opt-in detail flags whose shape we don't control.
+
+### Hooks that POST straight to Loki
+
+**Rejected because**: one HTTP request per tool call, and every network problem becomes a hook problem. Batching
+through a buffer keeps hooks to a file append.
