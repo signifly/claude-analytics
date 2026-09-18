@@ -21,9 +21,13 @@ function disabled(env, warnings) {
 function dataDir(env, homedir, warnings) {
   if (env.CLAUDE_ANALYTICS_DIR) return env.CLAUDE_ANALYTICS_DIR;
   try {
-    return path.join(homedir(), ".claude", "analytics");
-  } catch {
-    // No HOME and no passwd entry for the uid: common in containers.
+    // HOME="" makes os.homedir() return "" rather than throw; joining that
+    // would put the buffer inside whatever directory the session runs in.
+    const home = homedir();
+    if (typeof home === "string" && path.isAbsolute(home)) return path.join(home, ".claude", "analytics");
+  } catch {}
+  {
+    // No usable HOME and no passwd entry for the uid: common in containers.
     warnings.push("no home directory, keeping the event buffer in the temp dir (set CLAUDE_ANALYTICS_DIR)");
     return path.join(os.tmpdir(), "claude-analytics");
   }
