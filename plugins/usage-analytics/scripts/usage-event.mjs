@@ -1,18 +1,24 @@
 // Usage event: maps a Claude Code hook payload to the one thing we record.
 // See docs/architecture-decisions/0003-record-names-never-content.mdx.
 
-// Loki stream labels. Low-variety by construction; everything else stays in the log line.
+// Loki stream labels. Meant to stay low-cardinality: `kind` is a fixed set;
+// user/project/source are one value per person/repo/deployment but are not validated here.
 export const LABELS = ["user", "project", "source", "kind"];
 
 // The only fields an event may carry, and which of them hold identifiers.
 // (`ts` + `sub` together are the timestamp: milliseconds plus random sub-millisecond digits.)
 const FIELDS = ["ts", "sub", "kind", "name", "mcp_server", "user", "project", "source", "session_id", "subagent"];
 const IDENTIFIERS = new Set(["kind", "name", "mcp_server", "subagent"]);
+// The only fields the session context may supply; anything else in it is ignored.
+const CONTEXT_FIELDS = ["user", "project", "source"];
 
-// First token only, [\w:.-], so free text can never ride along in a name.
+const BARE = /^[\w:.-]{1,100}$/;
+
+// First token only, leading "/" stripped, [\w:.-], at most 100 characters —
+// so free text can never ride along in a name. Anything else is "unknown".
 export function bareName(value) {
   const token = String(value ?? "").trim().split(/\s/, 1)[0].replace(/^\//, "");
-  return /^[\w:.-]{1,100}$/.test(token) ? token : "unknown";
+  return BARE.test(token) ? token : "unknown";
 }
 
 function classify(payload) {
@@ -37,13 +43,20 @@ function classify(payload) {
 export function toEvent(payload, context, { now = Date.now(), sub = Math.floor(Math.random() * 1e6) } = {}) {
   const classified = classify(payload);
   if (!classified) return null;
-  const resolved = typeof context === "function" ? context() : context;
-  const draft = { ts: now, sub, ...classified, ...resolved, session_id: payload.session_id, subagent: payload.agent_type || undefined };
+  const resolved = (typeof context === "function" ? context() : context) || {};
+  const draft = { ts: now, sub, ...classified, session_id: payload.session_id ?? undefined, subagent: payload.agent_type || undefined };
+  for (const field of CONTEXT_FIELDS) {
+    const value = resolved[field];
+    draft[field] = typeof value === "string" || typeof value === "number" ? String(value).slice(0, 200) : "unknown";
+  }
   // The allow-list is the last step: a branch above cannot leak a field it was never allowed to emit.
   const event = {};
   for (const field of FIELDS) {
     if (draft[field] === undefined && field !== "name") continue; // every event has a name
-    event[field] = IDENTIFIERS.has(field) ? bareName(draft[field]) : draft[field];
+    if (IDENTIFIERS.has(field)) event[field] = bareName(draft[field]);
+    // A session id is an id or nothing: no first-token leniency for free text.
+    else if (field === "session_id") event[field] = typeof draft[field] === "string" && BARE.test(draft[field]) ? draft[field] : "unknown";
+    else event[field] = draft[field];
   }
   return event;
 }

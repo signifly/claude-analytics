@@ -88,3 +88,40 @@ test("takeovers are reported to the log", () => {
   acquire(dir, { log: (line) => lines.push(line) }).release();
   assert.match(lines.join("\n"), /stale lock \(pid 999999\)/);
 });
+
+test("a lock that cannot be read is left alone, not taken over", () => {
+  const dir = tmpDir();
+  fs.mkdirSync(pidFile(dir)); // reading it fails with EISDIR
+  const lines = [];
+  assert.equal(isHeld(dir), true);
+  assert.equal(acquire(dir, { log: (l) => lines.push(l) }), null);
+  assert.match(lines.join("\n"), /cannot read lock/);
+  assert.ok(fs.statSync(pidFile(dir)).isDirectory());
+});
+
+test("a read hiccup does not make a flusher give up its lock", () => {
+  const dir = tmpDir();
+  const lock = acquire(dir);
+  fs.rmSync(pidFile(dir));
+  fs.mkdirSync(pidFile(dir));
+  assert.equal(lock.stillMine(), true);
+});
+
+test("on a filesystem without hard links the lock is still exclusive", () => {
+  const dir = tmpDir();
+  const noLinks = () => { throw Object.assign(new Error("operation not supported"), { code: "ENOTSUP" }); };
+  const lock = acquire(dir, { link: noLinks });
+  assert.ok(lock);
+  assert.equal(isHeld(dir), true);
+  assert.equal(acquire(dir, { link: noLinks }), null);
+  lock.release();
+  assert.deepEqual(fs.readdirSync(dir), []);
+});
+
+test("a data dir that does not exist yet can be locked, leaving nothing else behind", () => {
+  const dir = path.join(tmpDir(), "not", "yet");
+  assert.equal(isHeld(dir), false);
+  const lock = acquire(dir);
+  assert.deepEqual(fs.readdirSync(dir), ["flusher.pid"]);
+  lock.release();
+});

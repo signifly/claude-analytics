@@ -117,3 +117,23 @@ test("session context is only looked up for payloads that produce an event", () 
   assert.equal(toEvent(tool("Read"), lookup, at).user, "dev@example.com");
   assert.equal(lookups, 1);
 });
+
+test("a session id that is not a bare identifier never carries text into the event", () => {
+  for (const session_id of ["SECRET words here", { leak: "SECRET" }, ["SECRET", "x y"]]) {
+    const event = toEvent({ ...tool("Read"), session_id }, context, at);
+    assert.ok(!JSON.stringify(event).includes("SECRET"), JSON.stringify(event));
+    assert.match(event.session_id, /^[\w:.-]{1,100}$/);
+  }
+  assert.equal(toEvent({ ...tool("Read"), session_id: "1e3a7f53-8327-48cd-b0b4-c0fc35570a8e" }, context, at).session_id, "1e3a7f53-8327-48cd-b0b4-c0fc35570a8e");
+});
+
+test("session context can only supply user, project and source", () => {
+  const tampered = { ...context, kind: "x", name: "SECRET", ts: 1, sub: 2, cwd: "/secret", session_id: "other", subagent: "SECRET" };
+  const event = toEvent(tool("Read"), tampered, at);
+  assert.deepEqual(event, { ts: at.now, sub: at.sub, kind: "tool", name: "Read", user: "dev@example.com", project: "webshop", source: "dev", session_id: "s-1" });
+});
+
+test("context values are recorded as text, whatever a damaged cache holds", () => {
+  const event = toEvent(tool("Read"), { user: { a: 1 }, project: null, source: 7 }, at);
+  assert.deepEqual([event.user, event.project, event.source], ["unknown", "unknown", "7"]);
+});

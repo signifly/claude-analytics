@@ -1,46 +1,72 @@
 // The only diagnostics channel for the hooks and the flusher. Best-effort and
 // never throws: analytics must not surface errors into a session.
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import util from "node:util";
 
 const MAX_LOG_BYTES = 1024 * 1024;
 const ONCE_MS = 60 * 60 * 1000;
 
-// One line for any error: its message plus the code or cause that explains it.
+// One line for any thrown value: its message plus the code or cause that explains it.
 export function describe(err) {
-  const cause = err?.cause?.code || err?.cause?.errors?.[0]?.code || err?.cause?.message;
-  return [err?.code && !String(err?.message).includes(err.code) ? err.code : "", err?.message ?? String(err), cause].filter(Boolean).join(": ");
+  try {
+    if (typeof err === "string") return err;
+    if (!(err instanceof Error)) return util.inspect(err, { depth: 1, breakLength: Infinity });
+    const cause = err.cause?.code || err.cause?.errors?.[0]?.code || err.cause?.message;
+    const code = err.code && !String(err.message).includes(err.code) ? err.code : "";
+    return [code, err.message, cause].filter(Boolean).join(": ");
+  } catch {
+    return "undescribable error";
+  }
 }
 
-export function createLog(dir) {
+export function createLog(dir, { fallbackDir = os.tmpdir(), maxBytes = MAX_LOG_BYTES } = {}) {
   const file = path.join(dir, "flusher.log");
+  const fallbackFile = path.join(fallbackDir, "claude-analytics.log");
+
+  // Appends with a size cap: the previous generation is kept as <file>.1.
+  function write(target, line) {
+    try {
+      if (fs.statSync(target).size > maxBytes) fs.renameSync(target, `${target}.1`);
+    } catch {}
+    fs.appendFileSync(target, line);
+  }
 
   function log(msg) {
     const line = `${new Date().toISOString()} [${process.pid}] ${msg}\n`;
     try {
       fs.mkdirSync(dir, { recursive: true });
-      try {
-        if (fs.statSync(file).size > MAX_LOG_BYTES) fs.renameSync(file, `${file}.1`);
-      } catch {}
-      fs.appendFileSync(file, line);
+      write(file, line);
     } catch {
       try {
-        fs.appendFileSync(path.join(os.tmpdir(), "claude-analytics.log"), line); // data dir unwritable
+        write(fallbackFile, line); // data dir unwritable
       } catch {}
     }
   }
 
-  // At most once per hour per key, for conditions that would otherwise repeat on every hook event.
+  // At most once per hour per key, for conditions that would otherwise repeat
+  // on every hook event. The marker falls back too, or an unwritable data dir
+  // would turn the throttle off exactly when it is needed.
   function logOnce(key, msg) {
-    const marker = path.join(dir, `.logged-${key}`);
-    try {
-      if (Date.now() - fs.statSync(marker).mtimeMs < ONCE_MS) return;
-    } catch {}
+    const name = `.logged-${String(key).replace(/[^\w.-]/g, "_")}`;
+    const markers = [
+      path.join(dir, name),
+      path.join(fallbackDir, `claude-analytics${name}-${crypto.createHash("sha1").update(dir).digest("hex").slice(0, 8)}`),
+    ];
+    for (const marker of markers) {
+      try {
+        if (Date.now() - fs.statSync(marker).mtimeMs < ONCE_MS) return;
+      } catch {}
+    }
     log(msg);
-    try {
-      fs.writeFileSync(marker, "");
-    } catch {}
+    for (const marker of markers) {
+      try {
+        fs.writeFileSync(marker, "");
+        return;
+      } catch {}
+    }
   }
 
   return { file, log, logOnce };
