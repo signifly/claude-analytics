@@ -280,9 +280,13 @@ test("the same holds when the batch was only partly handled", () => {
 
 test("settled batches are cleaned up once no slow writer can still be holding them", () => {
   const dir = tmpDir();
-  const buffer = open(dir, { settleGraceMs: 0 });
+  const buffer = open(dir, { settleGraceMs: 5000 });
   buffer.append(event("a"));
   buffer.claim()[0].settle();
+  buffer.claim();
+  assert.equal(fs.readdirSync(dir).length, 1); // still watched during the grace period
+  const tenSecondsAgo = new Date(Date.now() - 10_000);
+  for (const name of fs.readdirSync(dir)) fs.utimesSync(path.join(dir, name), tenSecondsAgo, tenSecondsAgo);
   buffer.claim();
   assert.deepEqual(fs.readdirSync(dir), []);
 });

@@ -53,3 +53,53 @@
 2026-09-18T21:00:57.444Z [31190] push failed, retry in 400ms: fetch failed: bad port
 2026-09-18T21:00:57.847Z [31190] push failed, retry in 800ms: fetch failed: bad port
 2026-09-18T21:00:57.847Z [31190] flusher idle, exiting
+2026-09-18T21:01:13.658Z [32208] flusher started -> http://127.0.0.1:9
+2026-09-18T21:01:13.776Z [32208] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:01:13.979Z [32208] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:01:14.382Z [32208] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:01:14.382Z [32208] flusher idle, exiting
+2026-09-18T21:01:21.315Z [32818] flusher started -> http://127.0.0.1:9
+2026-09-18T21:01:21.431Z [32818] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:01:21.633Z [32818] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:01:22.036Z [32818] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:01:22.036Z [32818] flusher idle, exiting
+2026-09-18T21:01:28.935Z [33349] flusher started -> http://127.0.0.1:9
+2026-09-18T21:01:29.050Z [33349] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:01:29.252Z [33349] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:01:29.656Z [33349] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:01:29.657Z [33349] flusher idle, exiting
+2026-09-18T21:01:36.551Z [33883] flusher started -> http://127.0.0.1:9
+2026-09-18T21:01:36.669Z [33883] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:01:36.871Z [33883] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:01:37.274Z [33883] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:01:37.274Z [33883] flusher idle, exiting
+2026-09-18T21:01:44.156Z [34405] flusher started -> http://127.0.0.1:9
+2026-09-18T21:01:44.270Z [34405] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:01:44.473Z [34405] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:01:44.875Z [34405] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:01:44.876Z [34405] flusher idle, exiting
+2026-09-18T21:01:51.861Z [34914] flusher started -> http://127.0.0.1:9
+2026-09-18T21:01:51.976Z [34914] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:01:52.179Z [34914] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:01:52.582Z [34914] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:01:52.582Z [34914] flusher idle, exiting
+2026-09-18T21:02:10.740Z [35960] flusher started -> http://127.0.0.1:9
+2026-09-18T21:02:10.857Z [35960] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:02:11.061Z [35960] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:02:11.464Z [35960] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:02:11.464Z [35960] flusher idle, exiting
+2026-09-18T21:02:18.358Z [36526] flusher started -> http://127.0.0.1:9
+2026-09-18T21:02:18.476Z [36526] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:02:18.679Z [36526] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:02:19.082Z [36526] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:02:19.082Z [36526] flusher idle, exiting
+2026-09-18T21:02:25.979Z [37053] flusher started -> http://127.0.0.1:9
+2026-09-18T21:02:26.093Z [37053] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:02:26.295Z [37053] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:02:26.698Z [37053] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:02:26.699Z [37053] flusher idle, exiting
+2026-09-18T21:02:33.666Z [37597] flusher started -> http://127.0.0.1:9
+2026-09-18T21:02:33.781Z [37597] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:02:33.982Z [37597] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:02:34.386Z [37597] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:02:34.386Z [37597] flusher idle, exiting
