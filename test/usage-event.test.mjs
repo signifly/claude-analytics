@@ -137,3 +137,28 @@ test("context values are recorded as text, whatever a damaged cache holds", () =
   const event = toEvent(tool("Read"), { user: { a: 1 }, project: null, source: 7 }, at);
   assert.deepEqual([event.user, event.project, event.source], ["unknown", "unknown", "7"]);
 });
+
+for (const [what, hostile] of [
+  ["tool_input that is not an object", { tool_name: "Skill", tool_input: "SECRET text" }],
+  ["a skill name that is an object", { tool_name: "Skill", tool_input: { skill: { SECRET: 1 } } }],
+  ["a tool name that is an object", { tool_name: { SECRET: 1 }, tool_input: {} }],
+  ["a tool name that is a number", { tool_name: 42, tool_input: {} }],
+  ["a name with a newline", { tool_name: "Skill", tool_input: { skill: "commit\nSECRET" } }],
+  ["a name over 100 characters", { tool_name: "Skill", tool_input: { skill: "S".repeat(101) + "ECRET" } }],
+  ["an agent type that is an object", { tool_name: "Read", tool_input: {}, agent_type: { SECRET: 1 } }],
+  ["a __proto__ key", JSON.parse('{"tool_name":"Read","tool_input":{},"__proto__":{"name":"SECRET"}}')],
+]) {
+  test(`${what} never carries text into the event`, () => {
+    const event = toEvent({ ...base, hook_event_name: "PostToolUse", ...hostile }, context, at);
+    assert.ok(!JSON.stringify(event).includes("SECRET"), JSON.stringify(event));
+    for (const field of ["kind", "name"]) assert.match(event[field], /^[\w:.-]{1,100}$/);
+  });
+}
+
+test("exactly 100 characters is still a name", () => {
+  assert.equal(toEvent(tool("Skill", { skill: "s".repeat(100) }), context, at).name, "s".repeat(100));
+});
+
+test("a payload that is not an object produces nothing", () => {
+  for (const payload of [null, undefined, "text", 7]) assert.equal(toEvent(payload, context, at), null);
+});

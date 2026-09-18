@@ -24,8 +24,9 @@ export function createLokiSink({ url, token, basicAuth, tenant, fetch = globalTh
         for (const key of LABELS) stream[key] = String(event[key] ?? "unknown");
         const id = JSON.stringify(stream);
         if (!streams.has(id)) streams.set(id, { stream, values: [] });
-        // ms timestamp + the event's own sub-ms digits: unique, and identical on
-        // a re-push, so Loki drops the duplicate instead of double counting.
+        // ms timestamp + the event's random `sub` digits: stable across re-pushes, so
+        // a retry sends the same (timestamp, line) and Loki treats it as a duplicate.
+        // The index fallback covers events written without `sub`; it is not retry-stable.
         const ns = `${event.ts}${String((event.sub ?? i) % 1e6).padStart(6, "0")}`;
         const { ts, sub, ...line } = event;
         streams.get(id).values.push([ns, JSON.stringify(line)]);

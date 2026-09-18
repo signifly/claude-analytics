@@ -95,3 +95,32 @@ test("the lock is checked, and its heartbeat refreshed, before every push of a l
   assert.ok(h.beats() >= 200);
 });
 
+
+test("with the real flush pass: an outage, then recovery, delivers everything once and then goes idle", async () => {
+  const { openBuffer } = await import("../plugins/usage-analytics/scripts/event-buffer.mjs");
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drain-"));
+  const buffer = openBuffer(dir);
+  for (const name of ["a", "b", "c"]) buffer.append({ ts: Date.now(), sub: 1, kind: "tool", name });
+
+  const h = harness();
+  const delivered = [];
+  let outage = 3;
+  const sink = { async push(events) { if (outage-- > 0) throw new Error("503 busy"); delivered.push(...events.map((e) => e.name)); return "ok"; } };
+  const { flush, ...options } = h.options; // use drain's default: the real flushOnce
+  assert.equal(await drain({ ...options, buffer, sink }), true);
+  assert.deepEqual(delivered, ["a", "b", "c"]);
+  assert.equal(h.lines.filter((l) => l.startsWith("push failed")).length, 3);
+  assert.ok(h.lines.includes("push recovered"));
+  assert.deepEqual(buffer.claim(), []); // nothing held
+});
+
+test("new events arriving count as activity even while the sink is down", async () => {
+  let pendingFor = 20;
+  const h = harness({ passes: Array.from({ length: 40 }, () => ({ error: new Error("down") })) });
+  h.options.buffer = { pending: () => pendingFor-- > 0 };
+  await drain(h.options);
+  assert.ok(h.sleeps.reduce((a, b) => a + b) > 20 * MINUTE); // the idle clock restarted while events kept arriving
+});

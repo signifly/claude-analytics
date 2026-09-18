@@ -2,13 +2,17 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { test } from "node:test";
+import { spawn, spawnSync } from "node:child_process";
+import { after, test } from "node:test";
 import { acquire, isHeld, spawnAllowed } from "../plugins/usage-analytics/scripts/flusher-lock.mjs";
 
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "flusher-lock-"));
 const pidFile = (dir) => path.join(dir, "flusher.pid");
-const DEAD_PID = 999_999; // beyond macOS's pid range and far above anything a test machine hands out
-const LIVE_FOREIGN_PID = process.ppid;
+// Independent sources of truth: a process that has certainly exited, and one that is certainly alive.
+const DEAD_PID = spawnSync(process.execPath, ["-e", ""]).pid;
+const bystander = spawn(process.execPath, ["-e", "setInterval(() => {}, 1e9)"], { stdio: "ignore" });
+after(() => bystander.kill());
+const LIVE_FOREIGN_PID = bystander.pid;
 const longAgo = new Date(Date.now() - 60 * 60 * 1000);
 
 test("a free data dir can be locked, and is free again after release", () => {
@@ -86,7 +90,7 @@ test("takeovers are reported to the log", () => {
   fs.writeFileSync(pidFile(dir), String(DEAD_PID));
   const lines = [];
   acquire(dir, { log: (line) => lines.push(line) }).release();
-  assert.match(lines.join("\n"), /stale lock \(pid 999999\)/);
+  assert.ok(lines.join("\n").includes(`stale lock (pid ${DEAD_PID})`));
 });
 
 test("a lock that cannot be read is left alone, not taken over", () => {

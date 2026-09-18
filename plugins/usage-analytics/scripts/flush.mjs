@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Flusher entry point: one per data dir. Takes the flusher lock, drains the
-// event buffer into Loki until idle, and makes sure nothing is stranded on exit.
+// Flusher entry point: one per data dir. Takes the flusher lock and drains the
+// event buffer into Loki until idle; after releasing the lock it re-checks the
+// live file, so an event appended during shutdown is not stranded.
 // Spawned on demand by record.mjs; inherits the Loki settings of that session.
 import { loadConfig } from "./config.mjs";
 import { openBuffer } from "./event-buffer.mjs";

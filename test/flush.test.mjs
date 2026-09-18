@@ -94,11 +94,17 @@ test("newer batches wait behind a held one, so order is kept", async () => {
   assert.deepEqual(sink.delivered(), ["old", "new"]);
 });
 
-test("pushes stay under the size limit", async () => {
-  const { buffer } = bufferWith("a", "b", "c", "d", "e");
+test("a large batch is split into pushes under the size limit, in order", async () => {
+  const names = Array.from({ length: 40 }, (_, i) => `event-${i}`);
+  const { buffer } = bufferWith(...names);
+  const sizes = [];
   const sink = scriptedSink();
-  await flushOnce(buffer, sink, { maxPushBytes: 260 });
-  assert.deepEqual(sink.pushes.map((p) => p.names.length), [2, 2, 1]);
+  const push = sink.push;
+  sink.push = (events) => (sizes.push(Buffer.byteLength(JSON.stringify(events))), push(events));
+  await flushOnce(buffer, sink, { maxPushBytes: 1000 });
+  assert.ok(sizes.length > 1);
+  for (const size of sizes) assert.ok(size <= 1000, `a push of ${size} bytes`);
+  assert.deepEqual(sink.delivered(), names);
 });
 
 test("a buffer failure is reported like any other failed attempt, not thrown", async () => {

@@ -33,3 +33,11 @@ test("unusable intervals fall back to the defaults with a warning", () => {
   }
   assert.equal(loadConfig({ CLAUDE_ANALYTICS_FLUSH_MS: "250" }).flushMs, 250);
 });
+
+test("an empty or relative home directory is treated as no home, never as a path inside the working directory", () => {
+  for (const home of ["", "relative/home", undefined]) {
+    const config = loadConfig({}, { homedir: () => home });
+    assert.equal(config.dataDir, path.join(os.tmpdir(), "claude-analytics"), `homedir=${home}`);
+    assert.match(config.warnings.join("\n"), /no home directory/);
+  }
+});

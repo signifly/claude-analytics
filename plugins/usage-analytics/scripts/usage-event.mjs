@@ -22,6 +22,7 @@ export function bareName(value) {
 }
 
 function classify(payload) {
+  if (!payload || typeof payload !== "object") return null;
   if (payload.hook_event_name === "UserPromptSubmit") {
     // A command is a leading "/token"; a path has further slashes and is just a prompt.
     const token = String(payload.prompt || "").trimStart().split(/\s/, 1)[0];

@@ -77,7 +77,7 @@ test("torn and expired lines are skipped and counted in the log, the rest surviv
   assert.match(lines.join("\n"), /skipped 1 expired and 1 corrupt/);
 });
 
-test("an event written into a batch after it was claimed is not lost", () => {
+test("a late write before the batch is settled (a late tail) stays held", () => {
   const dir = tmpDir();
   const buffer = open(dir);
   buffer.append(event("claimed"));
@@ -92,7 +92,15 @@ test("a full buffer refuses new events instead of growing", () => {
   const buffer = open(tmpDir(), { maxBacklogBytes: 100 });
   assert.equal(buffer.append(event("a".repeat(100))), true);
   assert.equal(buffer.append(event("overflow")), false);
-  assert.deepEqual(names(buffer.claim()).length, 1);
+  assert.equal(names(buffer.claim()).length, 1);
+});
+
+test("a live file that filled to the cap is still delivered, not thrown away as over-cap", () => {
+  const lines = [];
+  const buffer = open(tmpDir(), { maxBacklogBytes: 100, log: (l) => lines.push(l) });
+  buffer.append(event("big-" + "x".repeat(200)));
+  assert.equal(names(buffer.claim()).length, 1);
+  assert.deepEqual(lines, []);
 });
 
 test("a backlog over its cap loses its oldest batch first, and says so", () => {
@@ -118,20 +126,27 @@ test("an unreadable batch is quarantined and does not block the batches behind i
   assert.deepEqual(fs.readdirSync(path.join(dir, "dead")), ["batch-0000000000000-1-000000.jsonl"]);
 });
 
-test("dead/ is capped too", () => {
+test("dead/ is capped too: the oldest files go first and the newest always stays", () => {
   const dir = tmpDir();
-  const buffer = open(dir, { maxDeadBytes: 120 });
   let tick = NOW;
-  const ticking = openBuffer(dir, { maxDeadBytes: 120, now: () => tick++ });
-  for (const n of ["one", "two", "three"]) {
-    ticking.append(event(n + "-" + "x".repeat(40), tick));
-    const [batch] = ticking.claim();
+  const buffer = openBuffer(dir, { maxDeadBytes: 120, now: () => tick++ });
+  for (const [i, n] of ["one", "two", "three"].entries()) {
+    buffer.append(event(n + "-" + "x".repeat(40), tick));
+    const [batch] = buffer.claim();
     batch.settle({ rejected: batch.events });
+    // age is modification time; don't leave it to the filesystem's timestamp resolution
+    for (const f of fs.readdirSync(path.join(dir, "dead"))) {
+      const file = path.join(dir, "dead", f);
+      if (fs.readFileSync(file, "utf8").includes(n + "-")) fs.utimesSync(file, new Date(NOW + i * 60_000), new Date(NOW + i * 60_000));
+    }
   }
+  buffer.append(event("four-" + "x".repeat(40), tick));
+  const [batch] = buffer.claim();
+  batch.settle({ rejected: batch.events });
   const dead = fs.readdirSync(path.join(dir, "dead")).map((f) => fs.readFileSync(path.join(dir, "dead", f), "utf8")).join("");
   assert.equal(dead.includes("one-"), false);
-  assert.equal(dead.includes("three-"), true);
-  assert.ok(buffer);
+  assert.equal(dead.includes("two-"), false);
+  assert.equal(dead.includes("four-"), true);
 });
 
 test("unreadable batches count against the dead/ cap too", () => {
@@ -236,4 +251,101 @@ test("two flushers' batches on one dir keep their age order and never overwrite 
   first.claim();
   second.append(event("from-second"));
   assert.deepEqual(names(second.claim()), ["from-first", "from-second"]);
+});
+
+test("a late write after the batch was settled becomes a batch of its own", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  buffer.append(event("claimed"));
+  const [batch] = buffer.claim();
+  const slowWriter = fs.openSync(batchFiles(dir)[0], "a"); // opened the live file before the claim…
+  batch.settle();
+  fs.writeSync(slowWriter, JSON.stringify(event("after-settle")) + "\n"); // …and only now gets to write
+  fs.closeSync(slowWriter);
+  assert.deepEqual(names(buffer.claim()), ["after-settle"]);
+});
+
+test("the same holds when the batch was only partly handled", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  buffer.append(event("a"));
+  buffer.append(event("b"));
+  const [batch] = buffer.claim();
+  const slowWriter = fs.openSync(batchFiles(dir)[0], "a");
+  batch.settle({ handled: 1 });
+  fs.writeSync(slowWriter, JSON.stringify(event("after-settle")) + "\n");
+  fs.closeSync(slowWriter);
+  assert.deepEqual(names(buffer.claim()).sort(), ["after-settle", "b"]);
+});
+
+test("settled batches are cleaned up once no slow writer can still be holding them", () => {
+  const dir = tmpDir();
+  const buffer = open(dir, { settleGraceMs: 5000 });
+  buffer.append(event("a"));
+  buffer.claim()[0].settle();
+  buffer.claim();
+  assert.equal(fs.readdirSync(dir).length, 1); // still watched during the grace period
+  const tenSecondsAgo = new Date(Date.now() - 10_000);
+  for (const name of fs.readdirSync(dir)) fs.utimesSync(path.join(dir, name), tenSecondsAgo, tenSecondsAgo);
+  buffer.claim();
+  assert.deepEqual(fs.readdirSync(dir), []);
+});
+
+test("settling the same batch repeatedly without progress changes nothing and never fails", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  for (const n of ["a", "b"]) buffer.append(event(n));
+  for (let i = 0; i < 3; i++) buffer.claim()[0].settle({ handled: 0 }); // the sink was down three passes in a row
+  assert.deepEqual(names(buffer.claim()), ["a", "b"]);
+});
+
+test("a batch settled in several equal-sized steps never trips over its own earlier steps", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  for (const n of ["a1", "a2", "a3", "a4"]) buffer.append(event(n));
+  for (const expected of [["a1", "a2", "a3", "a4"], ["a2", "a3", "a4"], ["a3", "a4"], ["a4"]]) {
+    const [batch] = buffer.claim();
+    assert.deepEqual(batch.events.map((e) => e.name), expected);
+    batch.settle({ handled: 1 });
+  }
+  assert.deepEqual(buffer.claim(), []);
+});
+
+test("a late write sitting in a settled batch counts as pending, so a flusher about to exit picks it up", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  buffer.append(event("claimed"));
+  const [batch] = buffer.claim();
+  const slowWriter = fs.openSync(batchFiles(dir)[0], "a");
+  batch.settle();
+  assert.equal(buffer.pending(), false);
+  fs.writeSync(slowWriter, JSON.stringify(event("late")) + "\n");
+  fs.closeSync(slowWriter);
+  assert.equal(buffer.pending(), true);
+  assert.deepEqual(names(buffer.claim()), ["late"]);
+  assert.equal(buffer.pending(), false);
+});
+
+test("the held rest of a partly handled batch, and late writes to it, stay ahead of newer batches", () => {
+  const dir = tmpDir();
+  let tick = NOW;
+  const buffer = openBuffer(dir, { now: () => tick++ });
+  for (const n of ["old-1", "old-2"]) buffer.append(event(n));
+  const [batch] = buffer.claim();
+  const slowWriter = fs.openSync(batchFiles(dir)[0], "a");
+  batch.settle({ handled: 1 });
+  fs.writeSync(slowWriter, JSON.stringify(event("old-late")) + "\n");
+  fs.closeSync(slowWriter);
+  buffer.append(event("new"));
+  assert.deepEqual(names(buffer.claim()), ["old-2", "old-late", "new"]);
+});
+
+test("leftover temp files from an interrupted settle are cleaned up", () => {
+  const dir = tmpDir();
+  const stale = path.join(dir, "batch-0000000000000-1-000000.jsonl.tmp");
+  fs.writeFileSync(stale, "half written");
+  const tenSecondsAgo = new Date(Date.now() - 10_000);
+  fs.utimesSync(stale, tenSecondsAgo, tenSecondsAgo);
+  open(dir).claim();
+  assert.deepEqual(fs.readdirSync(dir), []);
 });
