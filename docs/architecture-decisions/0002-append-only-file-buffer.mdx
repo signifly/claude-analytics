@@ -21,10 +21,15 @@ anything slower than a file write. Events are small (a few hundred bytes) and ar
 ## Decision
 
 Hooks append one complete JSON line per event to `events.jsonl`, opened in append mode, in a single write. The
-flusher claims the file by renaming it to `batch-<time>-<pid>.jsonl`; writers reopen the path for every event, so
-new events land in a fresh file. One flusher per data dir is enforced with a pid file and heartbeat.
+flusher claims the file by renaming it to `batch-<time>-<pid>-<seq>.jsonl`; writers reopen the path for every event,
+so new events land in a fresh file. One flusher per data dir is enforced with a pid file and heartbeat.
 
-The buffer is bounded (50 MB backlog, 20 MB dead folder) and torn lines are skipped and counted.
+Each part is bounded: the live file refuses appends over 50 MB, held batches are evicted oldest-first over 50 MB,
+`dead/` oldest-modified-first over 20 MB (the newest file of each is always kept). Unparseable lines are skipped and
+their count is logged.
+
+A settled batch is not deleted: it is renamed to `.settled-<bytes seen>-<id>` and watched for a grace period
+(5 s). If it grows, the extra bytes become a batch of their own. See the late-write consequence below.
 
 ## Consequences
 
@@ -32,16 +37,18 @@ The buffer is bounded (50 MB backlog, 20 MB dead folder) and torn lines are skip
 
 - No dependencies and no long-lived process required for capture.
 - Small single appends don't interleave on local filesystems, so writers need no lock.
-- Rename is atomic, so writers and the flusher never contend for the same file.
+- Rename is atomic, so writers and the flusher don't contend for the live file.
 - The buffer is plain text: inspectable and recoverable by hand.
 
 ### Negative Consequences
 
 - Append atomicity is not guaranteed on network filesystems or some container bind mounts, so a buffer must not be
   shared across machines or containers. Each container runs its own.
-- A writer that stalls between open and write can append to an already-claimed batch; the buffer has to preserve
-  that late tail.
-- The pid-based lock does not work across pid namespaces, for the same reason.
+- A writer that stalls between open and write can append to an already-claimed batch — before or after the flusher
+  settled it. Under CPU load this is not rare: a multi-process test lost about 1 event in 1800 in roughly one run in
+  eight while settled batches were deleted immediately. Hence the late tail at settle time and the grace period
+  after it. A writer stalled for longer than the grace period can still lose its event.
+- The pid-based lock does not work across pid namespaces, so a buffer must not be shared across containers either.
 
 ## Alternatives Considered
 

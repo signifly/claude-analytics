@@ -43,3 +43,13 @@
 2026-09-18T20:59:21.665Z [27750] push failed, retry in 400ms: fetch failed: bad port
 2026-09-18T20:59:22.067Z [27750] push failed, retry in 800ms: fetch failed: bad port
 2026-09-18T20:59:22.067Z [27750] flusher idle, exiting
+2026-09-18T21:00:25.854Z [29914] flusher started -> http://127.0.0.1:9
+2026-09-18T21:00:25.971Z [29914] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:00:26.174Z [29914] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:00:26.575Z [29914] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:00:26.575Z [29914] flusher idle, exiting
+2026-09-18T21:00:57.126Z [31190] flusher started -> http://127.0.0.1:9
+2026-09-18T21:00:57.242Z [31190] push failed, retry in 200ms: fetch failed: bad port
+2026-09-18T21:00:57.444Z [31190] push failed, retry in 400ms: fetch failed: bad port
+2026-09-18T21:00:57.847Z [31190] push failed, retry in 800ms: fetch failed: bad port
+2026-09-18T21:00:57.847Z [31190] flusher idle, exiting

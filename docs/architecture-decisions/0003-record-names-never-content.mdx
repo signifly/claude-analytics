@@ -21,7 +21,8 @@ record slash-command arguments through the `Skill` tool's input; both were revie
 
 ## Decision
 
-A usage event contains only: timestamp, kind, name, identity tag, project name, source, session id, and where
+A usage event contains only: timestamp (`ts` milliseconds plus `sub`, random sub-millisecond digits that keep it
+unique), kind, name, identity tag, project name, source, session id, and where
 present subagent type and MCP server. Every name is reduced to a bare identifier (first token, `[\w:.-]`, max 100
 characters, otherwise `unknown`).
 

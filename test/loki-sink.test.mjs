@@ -55,7 +55,7 @@ test("each entry gets a nanosecond timestamp from the event, stable across re-pu
   await sink.push([event()]);
   const [first, second] = loki.requests.map((r) => r.body.streams[0].values[0]);
   assert.equal(first[0], "1700000000000000042");
-  assert.deepEqual(first, second); // identical entry, so Loki dedupes a retry
+  assert.deepEqual(first, second); // same (timestamp, line): Loki treats a retry as a duplicate
 });
 
 test("the log line carries the event without the timestamp fields", async () => {

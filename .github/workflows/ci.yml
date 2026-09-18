@@ -7,10 +7,15 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest]
         node: [18, 22]
+        include:
+          # The lock and buffer lean on OS behaviour (hard links, mtimes, signals), and the team is on Macs.
+          - os: macos-latest
+            node: 22
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,7 +39,7 @@ jobs:
             node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$f" || exit 1
           done
       - name: Plugin and marketplace manifests validate
-        run: npx -y @anthropic-ai/claude-code@latest plugin validate .
+        run: npx -y @anthropic-ai/claude-code@2.1.277 plugin validate . # pinned: bump deliberately
       - run: docker compose config -q
       - name: Start Loki
         run: |
