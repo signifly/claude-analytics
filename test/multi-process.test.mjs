@@ -50,7 +50,7 @@ test("events appended by several processes while the flusher is claiming are eac
   }
 
   const expected = Array.from({ length: WRITERS }, (_, w) => Array.from({ length: EACH }, (_, i) => `w${w}-${i}`)).flat();
-  assert.equal(delivered.length, expected.length, "lost or duplicated events");
+  assert.equal(delivered.length, expected.length, "every event must be delivered exactly once");
   assert.deepEqual([...delivered].sort(), expected.sort());
   assert.deepEqual(fs.readdirSync(dir).filter((f) => f !== "dead"), []);
 });

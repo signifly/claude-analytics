@@ -58,6 +58,4 @@ function main() {
   }
 }
 
-try {
-  main();
-} catch {}
+main(); // record.mjs catches anything that escapes, including a failure to load this module

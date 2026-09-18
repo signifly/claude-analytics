@@ -77,7 +77,7 @@ test("torn and expired lines are skipped and counted in the log, the rest surviv
   assert.match(lines.join("\n"), /skipped 1 expired and 1 corrupt/);
 });
 
-test("an event written into a batch after it was claimed is not lost", () => {
+test("a late write before the batch is settled (a late tail) stays held", () => {
   const dir = tmpDir();
   const buffer = open(dir);
   buffer.append(event("claimed"));
@@ -253,7 +253,7 @@ test("two flushers' batches on one dir keep their age order and never overwrite 
   assert.deepEqual(names(second.claim()), ["from-first", "from-second"]);
 });
 
-test("an event written by a slow writer after its batch was settled is still not lost", () => {
+test("a late write after the batch was settled becomes a batch of its own", () => {
   const dir = tmpDir();
   const buffer = open(dir);
   buffer.append(event("claimed"));
@@ -309,4 +309,43 @@ test("a batch settled in several equal-sized steps never trips over its own earl
     batch.settle({ handled: 1 });
   }
   assert.deepEqual(buffer.claim(), []);
+});
+
+test("a late write sitting in a settled batch counts as pending, so a flusher about to exit picks it up", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  buffer.append(event("claimed"));
+  const [batch] = buffer.claim();
+  const slowWriter = fs.openSync(batchFiles(dir)[0], "a");
+  batch.settle();
+  assert.equal(buffer.pending(), false);
+  fs.writeSync(slowWriter, JSON.stringify(event("late")) + "\n");
+  fs.closeSync(slowWriter);
+  assert.equal(buffer.pending(), true);
+  assert.deepEqual(names(buffer.claim()), ["late"]);
+  assert.equal(buffer.pending(), false);
+});
+
+test("the held rest of a partly handled batch, and late writes to it, stay ahead of newer batches", () => {
+  const dir = tmpDir();
+  let tick = NOW;
+  const buffer = openBuffer(dir, { now: () => tick++ });
+  for (const n of ["old-1", "old-2"]) buffer.append(event(n));
+  const [batch] = buffer.claim();
+  const slowWriter = fs.openSync(batchFiles(dir)[0], "a");
+  batch.settle({ handled: 1 });
+  fs.writeSync(slowWriter, JSON.stringify(event("old-late")) + "\n");
+  fs.closeSync(slowWriter);
+  buffer.append(event("new"));
+  assert.deepEqual(names(buffer.claim()), ["old-2", "old-late", "new"]);
+});
+
+test("leftover temp files from an interrupted settle are cleaned up", () => {
+  const dir = tmpDir();
+  const stale = path.join(dir, "batch-0000000000000-1-000000.jsonl.tmp");
+  fs.writeFileSync(stale, "half written");
+  const tenSecondsAgo = new Date(Date.now() - 10_000);
+  fs.utimesSync(stale, tenSecondsAgo, tenSecondsAgo);
+  open(dir).claim();
+  assert.deepEqual(fs.readdirSync(dir), []);
 });

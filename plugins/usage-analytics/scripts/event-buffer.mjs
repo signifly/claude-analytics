@@ -115,46 +115,46 @@ export function openBuffer(dir, options = {}) {
 
   // A slow writer can still hold the claimed file open and write to it at any
   // moment, even after it was settled. So a settled file is never deleted or
-  // replaced directly: it lives on under a ".settled-<bytes seen>" name, where
-  // sweepSettled() watches it for late writes until the grace period is over.
-  // `held` (may be empty) becomes the new content under the batch's own name.
+  // replaced directly: it lives on under a ".settled-<bytes seen>-<id>" name,
+  // where sweepSettled() watches it for late writes until the grace period is over.
+  //
+  // `held` (may be empty) first becomes a batch of its own, under a name that
+  // keeps the parent's place in the age order. Only then is the parent retired,
+  // so no failure in between can lose the held events: the worst case is both
+  // files existing, and re-pushed events are deduplicated by the sink.
   function retire(file, bytesSeen, held) {
-    const settled = `${file}.settled-${bytesSeen}-${process.pid}-${retired++}`; // unique: a batch can be settled many times
-    const tmp = `${file}.tmp`;
-    try {
-      if (held.length) {
-        fs.writeFileSync(tmp, held);
-        try {
-          fs.linkSync(file, settled); // keep the old file reachable…
-          fs.renameSync(tmp, file); // …while the held events replace it atomically
-        } catch (err) {
-          fs.renameSync(file, settled); // no hard links here: a crash between these two loses the held events
-          fs.renameSync(tmp, file);
-        }
-      } else fs.renameSync(file, settled);
-    } finally {
-      try {
-        fs.rmSync(tmp, { force: true }); // only still there if something above failed
-      } catch {}
+    const base = file.replace(/\.jsonl$/, "");
+    const id = `${process.pid}-${retired++}`;
+    if (held.length) {
+      const tmp = `${file}.tmp`;
+      fs.writeFileSync(tmp, held);
+      fs.renameSync(tmp, `${base}-held-${id}.jsonl`);
     }
+    fs.renameSync(file, `${file}.settled-${bytesSeen}-${id}`);
   }
+
+  const lateBytes = (file) => size(file) - Number(path.basename(file).match(SETTLED)[2]);
 
   function sweepSettled() {
     for (const file of list(dir, SETTLED)) {
-      const [, batchName, seen, unique] = path.basename(file).match(SETTLED);
+      const [, batchName, seen, id] = path.basename(file).match(SETTLED);
       const info = stat(file);
       if (!info) continue;
       try {
         if (info.size > Number(seen)) {
-          // A late write: those bytes become a batch of their own, and we keep watching.
+          // A late write: those bytes become a batch of their own ("-late" sorts
+          // after the parent's "-held" rest and before any newer batch), and we keep watching.
           const late = fs.readFileSync(file).subarray(Number(seen));
-          fs.writeFileSync(path.join(dir, `${batchName.replace(/\.jsonl$/, "")}-late-${unique}-${seen}.jsonl`), late);
-          fs.renameSync(file, path.join(dir, `${batchName}.settled-${Number(seen) + late.length}-${unique}`));
+          fs.writeFileSync(path.join(dir, `${batchName.replace(/\.jsonl$/, "")}-late-${id}-${seen}.jsonl`), late);
+          fs.renameSync(file, path.join(dir, `${batchName}.settled-${Number(seen) + late.length}-${id}`));
+          // Deliberately the wall clock, not the injected now(): it is compared with a real file mtime.
         } else if (Date.now() - info.mtimeMs >= settleGraceMs) fs.rmSync(file, { force: true });
       } catch (err) {
         unexpected(`sweep ${path.basename(file)}`, err);
       }
     }
+    // An interrupted settle can leave its temp file behind; nothing else would ever look at it.
+    for (const tmp of list(dir, /^batch-.*\.jsonl\.tmp$/)) if (Date.now() - mtime(tmp) >= settleGraceMs) remove(tmp);
   }
 
   function readBatch(file) {
@@ -192,7 +192,9 @@ export function openBuffer(dir, options = {}) {
       // The first `handled` events are done with (delivered, or listed in
       // `rejected`); the rest stay held for a later claim.
       settle({ handled = events.length, rejected = [] } = {}) {
-        if (rejected.length && toDead(`rejected-${name}`, { lines: rejected.map((e) => JSON.stringify(e)) }))
+        // One dead/ file per original batch, however many held/late pieces it was settled in.
+        const origin = name.replace(/-(held|late)-.*$/, "").replace(/\.jsonl$/, "");
+        if (rejected.length && toDead(`rejected-${origin}.jsonl`, { lines: rejected.map((e) => JSON.stringify(e)) }))
           log(`${name}: ${rejected.length} rejected events kept in dead/`);
         // A writer that opened the live file before the claim may have
         // appended after we read it: that tail is held too.
@@ -222,7 +224,8 @@ export function openBuffer(dir, options = {}) {
       return true;
     },
 
-    pending: () => size(liveFile) > 0,
+    // Unclaimed events: in the live file, or written late into a settled batch.
+    pending: () => size(liveFile) > 0 || list(dir, SETTLED).some((file) => lateBytes(file) > 0),
 
     // Claims the live file by renaming it (writers reopen the path per event,
     // so new events land in a fresh file) and returns every held batch, oldest first.
