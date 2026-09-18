@@ -144,3 +144,96 @@ test("unreadable batches count against the dead/ cap too", () => {
   open(dir, { maxDeadBytes: 100 }).claim();
   assert.deepEqual(fs.readdirSync(path.join(dir, "dead")), ["batch-0000000000000-1-000000.jsonl"]);
 });
+
+test("when dead/ is unusable, an unreadable batch is discarded rather than blocking the batches behind it", () => {
+  const dir = tmpDir();
+  fs.writeFileSync(path.join(dir, "dead"), "not a directory");
+  fs.mkdirSync(path.join(dir, "batch-0000000000000-1-000000.jsonl"));
+  const lines = [];
+  const buffer = open(dir, { log: (l) => lines.push(l) });
+  buffer.append(event("behind"));
+  assert.deepEqual(names(buffer.claim()), ["behind"]);
+  assert.match(lines.join("\n"), /cannot keep batch-0000000000000-1-000000\.jsonl in dead\//);
+  assert.deepEqual(batchFiles(dir).length, 1); // only "behind" is still held
+});
+
+test("when dead/ is unusable, rejected events are discarded, the batch still settles, and the log does not claim they were kept", () => {
+  const dir = tmpDir();
+  fs.writeFileSync(path.join(dir, "dead"), "not a directory");
+  const lines = [];
+  const buffer = open(dir, { log: (l) => lines.push(l) });
+  buffer.append(event("bad"));
+  const [batch] = buffer.claim();
+  batch.settle({ rejected: batch.events });
+  assert.deepEqual(buffer.claim(), []);
+  assert.match(lines.join("\n"), /cannot keep/);
+  assert.doesNotMatch(lines.join("\n"), /kept in dead/);
+});
+
+test("a dead/ file that cannot be evicted does not stop batches from settling", { skip: process.getuid?.() === 0 && "root ignores permissions" }, () => {
+  const dir = tmpDir();
+  const dead = path.join(dir, "dead");
+  fs.mkdirSync(dead);
+  fs.writeFileSync(path.join(dead, "rejected-old.jsonl"), "x".repeat(500));
+  const lastWeek = new Date(Date.now() - 7 * DAY);
+  fs.utimesSync(path.join(dead, "rejected-old.jsonl"), lastWeek, lastWeek);
+  const lines = [];
+  const buffer = open(dir, { maxDeadBytes: 100, log: (l) => lines.push(l) });
+  buffer.append(event("bad"));
+  const [batch] = buffer.claim();
+  fs.chmodSync(dead, 0o555); // nothing in dead/ can be added or removed
+  try {
+    batch.settle({ rejected: batch.events });
+  } finally {
+    fs.chmodSync(dead, 0o755);
+  }
+  assert.deepEqual(buffer.claim(), []);
+  assert.match(lines.join("\n"), /cannot (keep|evict)/);
+});
+
+test("settling a batch whose file has vanished is harmless", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  buffer.append(event("a"));
+  const [batch] = buffer.claim();
+  fs.rmSync(batchFiles(dir)[0]);
+  batch.settle();
+  assert.deepEqual(buffer.claim(), []);
+});
+
+test("a partly handled batch keeps both its unhandled events and a late tail", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  buffer.append(event("a"));
+  buffer.append(event("b"));
+  const [batch] = buffer.claim();
+  fs.appendFileSync(batchFiles(dir)[0], JSON.stringify(event("late")) + "\n");
+  batch.settle({ handled: 1 });
+  assert.deepEqual(names(buffer.claim()), ["b", "late"]);
+  assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith(".tmp")), []);
+});
+
+test("rejections from the same batch accumulate in one dead/ file, without repeats", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  for (const n of ["bad-1", "ok", "bad-2"]) buffer.append(event(n));
+  let [batch] = buffer.claim();
+  batch.settle({ handled: 1, rejected: [batch.events[0]] });
+  [batch] = buffer.claim();
+  batch.settle({ rejected: [batch.events[1]] });
+  assert.deepEqual(buffer.claim(), []);
+  const files = fs.readdirSync(path.join(dir, "dead"));
+  assert.equal(files.length, 1);
+  const kept = fs.readFileSync(path.join(dir, "dead", files[0]), "utf8").trim().split("\n").map((l) => JSON.parse(l).name);
+  assert.deepEqual(kept, ["bad-1", "bad-2"]);
+});
+
+test("two flushers' batches on one dir keep their age order and never overwrite each other", () => {
+  const dir = tmpDir();
+  const first = openBuffer(dir, { now: () => 1000 + NOW });
+  const second = openBuffer(dir, { now: () => 1000 + NOW }); // same clock, same process
+  first.append(event("from-first"));
+  first.claim();
+  second.append(event("from-second"));
+  assert.deepEqual(names(second.claim()), ["from-first", "from-second"]);
+});

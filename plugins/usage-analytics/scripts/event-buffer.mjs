@@ -1,5 +1,5 @@
-// Event buffer: owns every byte under the data dir that holds usage events
-// between capture and delivery — the live file, claimed batches and dead/.
+// Event buffer: owns the files that hold usage events — the live file, claimed
+// batches and dead/. (The lock, log and sessions/ belong to other modules.)
 // See docs/architecture-decisions/0002-append-only-file-buffer.mdx.
 import fs from "node:fs";
 import path from "node:path";
@@ -22,46 +22,75 @@ export function openBuffer(dir, options = {}) {
   const deadDir = path.join(dir, "dead");
   let claims = 0;
 
-  const size = (file) => {
+  // A missing file is an ordinary answer; any other failure is reported (once
+  // per kind per process), because "0" or "nothing" would otherwise pass for an empty buffer.
+  const reported = new Set();
+  const unexpected = (what, err) => {
+    if (err?.code === "ENOENT" || err?.code === "ENOTDIR") return;
+    const key = `${what}:${err?.code}`;
+    if (!reported.has(key)) log(`cannot ${what}: ${describe(err)}`);
+    reported.add(key);
+  };
+  const stat = (file) => {
     try {
-      return fs.statSync(file).size;
-    } catch {
-      return 0;
+      return fs.statSync(file);
+    } catch (err) {
+      unexpected(`stat ${path.basename(file)}`, err);
+      return null;
     }
   };
-  const mtime = (file) => {
-    try {
-      return fs.statSync(file).mtimeMs;
-    } catch {
-      return 0;
-    }
-  };
+  const size = (file) => stat(file)?.size ?? 0;
+  const mtime = (file) => stat(file)?.mtimeMs ?? 0;
   const list = (folder, pattern) => {
     try {
       return fs.readdirSync(folder).filter((f) => pattern.test(f)).sort().map((f) => path.join(folder, f));
-    } catch {
+    } catch (err) {
+      unexpected(`list ${path.basename(folder)}/`, err);
       return [];
+    }
+  };
+  const remove = (file) => {
+    try {
+      fs.rmSync(file, { force: true, recursive: true });
+      return true;
+    } catch (err) {
+      log(`cannot remove ${path.basename(file)}: ${describe(err)}`);
+      return false;
     }
   };
   const toLines = (events) => events.map((e) => JSON.stringify(e) + "\n").join("");
 
   // Everything that enters dead/ comes through here: written whole, then capped.
-  // `source` is a file to move in, or the content for a new file.
-  function toDead(name, { file, content }) {
+  // Pass `file` to move an existing file in, or `lines` to add to a file of
+  // that name (repeats are ignored, so re-settling a batch doesn't pile up copies).
+  // Never throws, and returns whether the events were kept: dead/ is a courtesy,
+  // and failing to fill it must not block the batches behind.
+  function toDead(name, { file, lines }) {
     const target = path.join(deadDir, name);
+    const tmp = `${target}.tmp`;
+    let kept = true;
     try {
       fs.mkdirSync(deadDir, { recursive: true });
       if (file) fs.renameSync(file, target);
       else {
-        fs.writeFileSync(`${target}.tmp`, content);
-        fs.renameSync(`${target}.tmp`, target);
+        let existing = "";
+        try {
+          existing = fs.readFileSync(target, "utf8");
+        } catch {}
+        const known = new Set(existing.split("\n"));
+        fs.writeFileSync(tmp, existing + lines.filter((line) => !known.has(line)).map((line) => line + "\n").join(""));
+        fs.renameSync(tmp, target);
       }
     } catch (err) {
-      // dead/ is a courtesy; failing to fill it must never block the batches behind.
+      kept = false;
       log(`cannot keep ${name} in dead/ (${describe(err)}), discarding it`);
-      if (file) fs.rmSync(file, { force: true, recursive: true });
+      if (file) remove(file);
+      try {
+        fs.rmSync(tmp, { force: true });
+      } catch {}
     }
-    evictOldest(deadDir, /./, maxDeadBytes, "dead/", { byMtime: true });
+    evictOldest(deadDir, /^(?!.*\.tmp$)/, maxDeadBytes, "dead/", { byMtime: true });
+    return kept;
   }
 
   // Batch names carry their claim time, so name order is age order. dead/ mixes
@@ -74,7 +103,7 @@ export function openBuffer(dir, options = {}) {
     // batch slightly over it, and must not be thrown away whole.
     for (const { file, bytes } of files.slice(0, -1)) {
       if (total <= maxBytes) break;
-      fs.rmSync(file, { force: true, recursive: true });
+      if (!remove(file)) continue; // logged; try the next one rather than stalling delivery
       total -= bytes;
       log(`${what} over ${maxBytes} bytes: evicted ${path.basename(file)} (${bytes} bytes)`);
     }
@@ -88,8 +117,7 @@ export function openBuffer(dir, options = {}) {
     } catch (err) {
       if (err?.code === "ENOENT") return null;
       // An unreadable batch must not block the ones behind it.
-      log(`moved ${name} to dead/: unreadable (${describe(err)})`);
-      toDead(name, { file });
+      if (toDead(name, { file })) log(`moved ${name} to dead/: unreadable (${describe(err)})`);
       return null;
     }
 
@@ -105,7 +133,7 @@ export function openBuffer(dir, options = {}) {
         else if (event.ts < cutoff) expired++;
         else events.push(event);
       } catch {
-        corrupt++; // torn line
+        corrupt++; // unparseable, e.g. a torn write
       }
     }
     if (expired || corrupt) log(`${name}: skipped ${expired} expired and ${corrupt} corrupt lines`);
@@ -116,27 +144,35 @@ export function openBuffer(dir, options = {}) {
       // The first `handled` events are done with (delivered, or listed in
       // `rejected`); the rest stay held for a later claim.
       settle({ handled = events.length, rejected = [] } = {}) {
-        if (rejected.length) {
-          toDead(`rejected-${now()}-${name}`, { content: toLines(rejected) });
+        if (rejected.length && toDead(`rejected-${name}`, { lines: rejected.map((e) => JSON.stringify(e)) }))
           log(`${name}: ${rejected.length} rejected events kept in dead/`);
-        }
         // A writer that opened the live file before the claim may have
         // appended after we read it: that tail is held too.
         let tail = Buffer.alloc(0);
         try {
           tail = fs.readFileSync(file).subarray(raw.length);
-        } catch {}
+        } catch (err) {
+          // Gone is fine (evicted, cleaned up by hand). Anything else: leave the
+          // file alone — pushing it again is safe, deleting an unseen tail is not.
+          if (err?.code !== "ENOENT") throw err;
+        }
         const held = toLines(events.slice(handled));
         if (!held && !tail.length) return fs.rmSync(file, { force: true });
         const tmp = `${file}.tmp`;
-        fs.writeFileSync(tmp, Buffer.concat([Buffer.from(held), tail]));
-        fs.renameSync(tmp, file);
+        try {
+          fs.writeFileSync(tmp, Buffer.concat([Buffer.from(held), tail]));
+          fs.renameSync(tmp, file);
+        } finally {
+          try {
+            fs.rmSync(tmp, { force: true }); // only still there if the rename didn't happen
+          } catch {}
+        }
       },
     };
   }
 
   return {
-    // False when the buffer is full and the event was not stored.
+    // False when the live file is already over maxBacklogBytes: the event was not stored.
     append(event) {
       fs.mkdirSync(dir, { recursive: true });
       if (size(liveFile) > maxBacklogBytes) return false;
@@ -153,7 +189,12 @@ export function openBuffer(dir, options = {}) {
     claim() {
       if (size(liveFile) > 0) {
         try {
-          fs.renameSync(liveFile, path.join(dir, `batch-${now()}-${process.pid}-${String(claims++).padStart(6, "0")}.jsonl`));
+          // Name = claim time, then pid and a counter to keep it unique. Never
+          // reuse an existing name: rename would silently replace a held batch.
+          let target;
+          do target = path.join(dir, `batch-${now()}-${process.pid}-${String(claims++).padStart(6, "0")}.jsonl`);
+          while (fs.existsSync(target));
+          fs.renameSync(liveFile, target);
         } catch (err) {
           if (err?.code !== "ENOENT") log(`cannot claim buffer: ${describe(err)}`);
         }

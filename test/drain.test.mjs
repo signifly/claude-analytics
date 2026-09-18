@@ -73,14 +73,25 @@ test("a flusher that loses its lock stops, and says so", async () => {
   assert.match(h.lines.at(-1), /lock lost/);
 });
 
-test("the heartbeat is kept fresh during a long pass, after every push", async () => {
+test("losing the lock mid-pass stops at once and is never reported as a push failure", async () => {
+  const h = harness({ passes: [{ pushes: 5 }], lockLostAfter: 3 });
+  assert.equal(await drain(h.options), false);
+  assert.ok(h.pushed < 5);
+  assert.deepEqual(h.sleeps, [1000]); // no backoff sleep before exiting
+  assert.deepEqual(h.lines, ["lock lost to another flusher, exiting"]);
+});
+
+test("a pass that could not settle is logged for what it is and does not count as activity", async () => {
+  const settleError = Object.assign(new Error("ENOSPC: no space left"), { batch: "batch-1.jsonl" });
+  const h = harness({ passes: Array.from({ length: 2000 }, () => ({ delivered: 3, settleError })) });
+  assert.equal(await drain(h.options), true);
+  assert.match(h.lines[0], /delivered 3 .*batch-1\.jsonl.*could not settle.*ENOSPC/);
+  assert.ok(h.sleeps.reduce((a, b) => a + b) < 12 * MINUTE); // a full disk doesn't keep it alive
+});
+
+test("the lock is checked, and its heartbeat refreshed, before every push of a long pass", async () => {
   const h = harness({ passes: [{ pushes: 200, delivered: 200 }] });
   await drain(h.options);
   assert.ok(h.beats() >= 200);
 });
 
-test("once the lock is lost mid-pass, nothing more is pushed", async () => {
-  const h = harness({ passes: [{ pushes: 5 }], lockLostAfter: 3 }); // loop check, then two pushes
-  assert.equal(await drain(h.options), false);
-  assert.equal(h.pushed, 2);
-});

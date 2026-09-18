@@ -8,7 +8,7 @@ function chunk(events, maxBytes) {
   const chunks = [];
   let bytes = Infinity;
   for (const event of events) {
-    const size = Buffer.byteLength(JSON.stringify(event)) + 64;
+    const size = Buffer.byteLength(JSON.stringify(event)) + 64; // + per-entry timestamp/JSON overhead, roughly
     if (bytes + size > maxBytes) {
       chunks.push([]);
       bytes = 0;
@@ -19,10 +19,11 @@ function chunk(events, maxBytes) {
   return chunks;
 }
 
-// Never throws. On a retryable failure everything not yet handled stays held, in order,
-// and `error` says why; the caller decides when to try again.
+// Never throws. On a retryable failure everything not yet handled stays held,
+// in order, and `error` says why; `settleError` means events were delivered but
+// the buffer could not record it. The caller decides when to try again.
 export async function flushOnce(buffer, sink, { maxPushBytes = DEFAULT_MAX_PUSH_BYTES } = {}) {
-  const result = { delivered: 0, rejected: 0, error: null };
+  const result = { delivered: 0, rejected: 0, error: null, settleError: null };
   try {
     await pushAll(buffer, sink, maxPushBytes, result);
   } catch (err) {
@@ -46,7 +47,14 @@ async function pushAll(buffer, sink, maxPushBytes, result) {
       handled += events.length;
     }
     result.rejected += rejected.length;
-    batch.settle({ handled, rejected });
+    try {
+      batch.settle({ handled, rejected });
+    } catch (err) {
+      // Delivered but still on disk: it will be pushed again, which the sink
+      // dedupes. Reported separately, because nothing is wrong with the sink.
+      result.settleError = Object.assign(err, { batch: batch.name });
+      break;
+    }
     if (result.error) break; // keep order: don't send newer batches past a held one
   }
 }

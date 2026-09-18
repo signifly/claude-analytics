@@ -37,7 +37,7 @@ test("buffered events are delivered and leave the buffer", async () => {
   const sink = scriptedSink();
   const result = await flushOnce(buffer, sink);
   assert.deepEqual(sink.delivered(), ["a", "b"]);
-  assert.deepEqual(result, { delivered: 2, rejected: 0, error: null });
+  assert.deepEqual(result, { delivered: 2, rejected: 0, error: null, settleError: null });
   assert.deepEqual(buffer.claim(), []);
 });
 
@@ -52,7 +52,7 @@ test("an outage loses nothing: events are delivered once the sink recovers", asy
   assert.equal(failed.delivered, 0);
   assert.match(failed.error.message, /503/);
   const recovered = await flushOnce(buffer, sink);
-  assert.deepEqual(recovered, { delivered: 2, rejected: 0, error: null });
+  assert.deepEqual(recovered, { delivered: 2, rejected: 0, error: null, settleError: null });
   assert.deepEqual(sink.delivered(), ["a", "b"]);
 });
 
@@ -68,7 +68,7 @@ test("events the sink rejects are set aside in dead/ and the queue moves on", as
   const { dir, buffer } = bufferWith("a", "poison", "c");
   const sink = scriptedSink("ok", "rejected", "ok");
   const result = await flushOnce(buffer, sink, ONE_PER_PUSH);
-  assert.deepEqual(result, { delivered: 2, rejected: 1, error: null });
+  assert.deepEqual(result, { delivered: 2, rejected: 1, error: null, settleError: null });
   assert.deepEqual(sink.delivered(), ["a", "c"]);
   assert.deepEqual(buffer.claim(), []);
   const [dead] = fs.readdirSync(path.join(dir, "dead"));
@@ -105,4 +105,24 @@ test("a buffer failure is reported like any other failed attempt, not thrown", a
   const broken = { claim() { throw Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" }); } };
   const result = await flushOnce(broken, scriptedSink());
   assert.match(result.error.message, /EACCES/);
+});
+
+test("a batch that was delivered but could not be settled is reported as such, not as a push failure", async () => {
+  const stuck = {
+    claim: () => [{ name: "batch-1.jsonl", events: [event("a")], settle() { throw Object.assign(new Error("ENOSPC: no space left"), { code: "ENOSPC" }); } }],
+  };
+  const sink = scriptedSink();
+  const result = await flushOnce(stuck, sink);
+  assert.equal(result.error, null);
+  assert.equal(result.delivered, 1);
+  assert.match(result.settleError.message, /ENOSPC/);
+  assert.equal(result.settleError.batch, "batch-1.jsonl");
+});
+
+test("a single event larger than the push limit is still sent, alone", async () => {
+  const { buffer } = bufferWith("small", "x".repeat(500), "small-2");
+  const sink = scriptedSink();
+  await flushOnce(buffer, sink, { maxPushBytes: 200 });
+  assert.deepEqual(sink.pushes.map((p) => p.names.length), [1, 1, 1]);
+  assert.equal(sink.delivered().length, 3);
 });
