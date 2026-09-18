@@ -109,6 +109,21 @@ outputs, file contents, file paths or the working directory. Names are reduced t
 - **Labels** are low-cardinality: `service_name`, `user`, `project`, `source`, `kind`. The JSON log line repeats
   those and adds `name`, `session_id`, and where present `subagent` and `mcp_server`.
 
+### Modules
+
+All under `plugins/usage-analytics/scripts/`. Terms are defined in [CONTEXT.md](CONTEXT.md); decisions in
+[docs/architecture-decisions/](docs/architecture-decisions/).
+
+| Module | Owns |
+|---|---|
+| `usage-event.mjs` | `toEvent(payload, context)`: kinds, names, and the allow-list that keeps content out |
+| `event-buffer.mjs` | `append` / `claim` / `batch.settle`: the live file, batches, dead/, caps, expiry, late tails |
+| `flusher-lock.mjs` | `isHeld` / `acquire`: one flusher per data dir, pid file with heartbeat |
+| `flush-once.mjs` | `flushOnce(buffer, sink)`: chunking, resume, rejection handling |
+| `loki-sink.mjs` | the Loki adapter for the sink: streams, timestamps, auth, which status codes retry |
+| `session-context.mjs`, `config.mjs`, `log.mjs` | identity and project lookup, environment variables, diagnostics |
+| `record.mjs`, `flush.mjs` | entry points: the hook, and the flusher loop (interval, backoff, idle exit) |
+
 ### Event kinds
 
 | `kind` | From | `name` |
@@ -132,6 +147,17 @@ same Loki/Mimir/Tempo (delta metrics are converted to cumulative for Mimir):
 CLAUDE_CODE_ENABLE_TELEMETRY=1 OTEL_METRICS_EXPORTER=otlp OTEL_LOGS_EXPORTER=otlp \
 OTEL_EXPORTER_OTLP_PROTOCOL=grpc OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 claude
 ```
+
+## Development
+
+```sh
+npm test                                                  # unit tests, no network, no dependencies
+SMOKE_LOKI_URL=http://localhost:3100 node --test test/smoke.test.mjs   # real hook → real Loki
+```
+
+Tests live at the module interfaces above; the buffer and lock run against temp dirs, the flusher against an
+in-memory sink, the Loki adapter against an injected `fetch`. To ship a change, bump `version` in
+`plugins/usage-analytics/.claude-plugin/plugin.json`.
 
 ## Troubleshooting
 
