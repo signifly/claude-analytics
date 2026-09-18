@@ -10,17 +10,21 @@ const DEFAULTS = {
   maxDeadBytes: 20 * 1024 * 1024,
   // Loki (stack/loki.yaml) rejects samples older than 168h; stay a day inside that.
   maxAgeMs: 6 * 24 * 60 * 60 * 1000,
+  // How long a settled batch is kept and watched for late writes before it is removed.
+  settleGraceMs: 5000,
   now: Date.now,
   log: () => {},
 };
 
 const BATCH = /^batch-.*\.jsonl$/;
+const SETTLED = /^(batch-.*\.jsonl)\.settled-(\d+)-(.+)$/;
 
 export function openBuffer(dir, options = {}) {
-  const { maxBacklogBytes, maxDeadBytes, maxAgeMs, now, log } = { ...DEFAULTS, ...options };
+  const { maxBacklogBytes, maxDeadBytes, maxAgeMs, settleGraceMs, now, log } = { ...DEFAULTS, ...options };
   const liveFile = path.join(dir, "events.jsonl");
   const deadDir = path.join(dir, "dead");
   let claims = 0;
+  let retired = 0;
 
   // A missing file is an ordinary answer; any other failure is reported (once
   // per kind per process), because "0" or "nothing" would otherwise pass for an empty buffer.
@@ -109,6 +113,50 @@ export function openBuffer(dir, options = {}) {
     }
   }
 
+  // A slow writer can still hold the claimed file open and write to it at any
+  // moment, even after it was settled. So a settled file is never deleted or
+  // replaced directly: it lives on under a ".settled-<bytes seen>" name, where
+  // sweepSettled() watches it for late writes until the grace period is over.
+  // `held` (may be empty) becomes the new content under the batch's own name.
+  function retire(file, bytesSeen, held) {
+    const settled = `${file}.settled-${bytesSeen}-${process.pid}-${retired++}`; // unique: a batch can be settled many times
+    const tmp = `${file}.tmp`;
+    try {
+      if (held.length) {
+        fs.writeFileSync(tmp, held);
+        try {
+          fs.linkSync(file, settled); // keep the old file reachable…
+          fs.renameSync(tmp, file); // …while the held events replace it atomically
+        } catch (err) {
+          fs.renameSync(file, settled); // no hard links here: a crash between these two loses the held events
+          fs.renameSync(tmp, file);
+        }
+      } else fs.renameSync(file, settled);
+    } finally {
+      try {
+        fs.rmSync(tmp, { force: true }); // only still there if something above failed
+      } catch {}
+    }
+  }
+
+  function sweepSettled() {
+    for (const file of list(dir, SETTLED)) {
+      const [, batchName, seen, unique] = path.basename(file).match(SETTLED);
+      const info = stat(file);
+      if (!info) continue;
+      try {
+        if (info.size > Number(seen)) {
+          // A late write: those bytes become a batch of their own, and we keep watching.
+          const late = fs.readFileSync(file).subarray(Number(seen));
+          fs.writeFileSync(path.join(dir, `${batchName.replace(/\.jsonl$/, "")}-late-${unique}-${seen}.jsonl`), late);
+          fs.renameSync(file, path.join(dir, `${batchName}.settled-${Number(seen) + late.length}-${unique}`));
+        } else if (Date.now() - info.mtimeMs >= settleGraceMs) fs.rmSync(file, { force: true });
+      } catch (err) {
+        unexpected(`sweep ${path.basename(file)}`, err);
+      }
+    }
+  }
+
   function readBatch(file) {
     const name = path.basename(file);
     let raw;
@@ -154,19 +202,11 @@ export function openBuffer(dir, options = {}) {
         } catch (err) {
           // Gone is fine (evicted, cleaned up by hand). Anything else: leave the
           // file alone — pushing it again is safe, deleting an unseen tail is not.
-          if (err?.code !== "ENOENT") throw err;
+          if (err?.code === "ENOENT") return;
+          throw err;
         }
-        const held = toLines(events.slice(handled));
-        if (!held && !tail.length) return fs.rmSync(file, { force: true });
-        const tmp = `${file}.tmp`;
-        try {
-          fs.writeFileSync(tmp, Buffer.concat([Buffer.from(held), tail]));
-          fs.renameSync(tmp, file);
-        } finally {
-          try {
-            fs.rmSync(tmp, { force: true }); // only still there if the rename didn't happen
-          } catch {}
-        }
+        if (handled === 0 && !tail.length && events.length) return; // nothing changed: leave the batch exactly as it is
+        retire(file, raw.length + tail.length, Buffer.concat([Buffer.from(toLines(events.slice(handled))), tail]));
       },
     };
   }
@@ -199,6 +239,7 @@ export function openBuffer(dir, options = {}) {
           if (err?.code !== "ENOENT") log(`cannot claim buffer: ${describe(err)}`);
         }
       }
+      sweepSettled();
       evictOldest(dir, BATCH, maxBacklogBytes, "backlog");
       return list(dir, BATCH).map(readBatch).filter(Boolean);
     },

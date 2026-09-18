@@ -28,6 +28,24 @@ test("events are pushed to Loki's push endpoint as one stream per label set", as
     service_name: "claude-code-usage", user: "dev@example.com", project: "webshop", source: "dev", kind: "skill",
   });
   assert.equal(streams[0].values.length, 2);
+  assert.equal(streams[1].stream.kind, "tool");
+  assert.deepEqual(streams[1].values.map(([, line]) => JSON.parse(line).name), ["Bash"]);
+});
+
+test("events written by an older plugin, without sub-millisecond digits, still get distinct valid timestamps", async () => {
+  const loki = fakeLoki();
+  const old = ({ sub, ...rest }) => rest;
+  await createLokiSink({ url: "http://loki:3100", fetch: loki.fetch }).push([old(event()), old(event({ name: "b" }))]);
+  const stamps = loki.requests[0].body.streams[0].values.map(([ns]) => ns);
+  for (const ns of stamps) assert.match(ns, /^\d{19}$/);
+  assert.equal(new Set(stamps).size, 2);
+});
+
+test("a missing label value becomes unknown rather than failing the push", async () => {
+  const loki = fakeLoki();
+  const { user, ...anonymous } = event();
+  assert.equal(await createLokiSink({ url: "http://loki:3100", fetch: loki.fetch }).push([anonymous]), "ok");
+  assert.equal(loki.requests[0].body.streams[0].stream.user, "unknown");
 });
 
 test("each entry gets a nanosecond timestamp from the event, stable across re-pushes", async () => {
