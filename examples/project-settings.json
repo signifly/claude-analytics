@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "claude-analytics": {
+      "source": { "source": "github", "repo": "signifly/claude-analytics" }
+    }
+  },
+  "enabledPlugins": {
+    "usage-analytics@claude-analytics": true
+  },
+  "env": {
+    "CLAUDE_ANALYTICS_LOKI_URL": "http://localhost:3100"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "claude-analytics",
+  "description": "Claude Code usage analytics hooks for the Signifly Grafana/Loki stack",
+  "owner": { "name": "Signifly" },
+  "plugins": [
+    {
+      "name": "usage-analytics",
+      "source": "./plugins/usage-analytics",
+      "description": "Ships Claude Code skill, slash-command and tool usage to Grafana Loki"
+    }
+  ]
+}

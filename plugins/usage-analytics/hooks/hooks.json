@@ -1,0 +1,27 @@
+{
+  "description": "Records skill, slash-command and tool usage to a local buffer that is batch-flushed to Grafana Loki",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/record.mjs\"", "async": true }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/record.mjs\"", "async": true }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/record.mjs\"", "async": true }
+        ]
+      }
+    ]
+  }
+}
