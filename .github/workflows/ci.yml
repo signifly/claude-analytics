@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm run check
+      - run: npm test
+
+  stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Manifests are valid JSON
+        run: |
+          for f in .claude-plugin/marketplace.json plugins/usage-analytics/.claude-plugin/plugin.json \
+                   plugins/usage-analytics/hooks/hooks.json examples/project-settings.json \
+                   stack/grafana/dashboards/*.json; do
+            node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$f" || exit 1
+          done
+      - name: Plugin and marketplace manifests validate
+        run: npx -y @anthropic-ai/claude-code@latest plugin validate .
+      - run: docker compose config -q
+      - name: Start Loki
+        run: |
+          docker compose up -d loki
+          timeout 90 sh -c 'until curl -sf http://localhost:3100/ready; do sleep 2; done'
+      - name: Hook to Loki smoke test
+        run: node --test test/smoke.test.mjs
+        env:
+          SMOKE_LOKI_URL: http://localhost:3100
+      - if: failure()
+        run: docker compose logs loki | tail -50

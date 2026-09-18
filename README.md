@@ -35,7 +35,7 @@ provisioned from `stack/grafana/dashboards/`; edit the JSON there, UI edits are 
 The repo is a plugin marketplace. Per developer:
 
 ```sh
-claude plugin marketplace add <git-url-or-path-of-this-repo>
+claude plugin marketplace add signifly/claude-analytics
 claude plugin install usage-analytics@claude-analytics
 ```
 
@@ -92,7 +92,7 @@ outputs, file contents, file paths or the working directory. Names are reduced t
 
 - **Hooks** (`hooks/hooks.json`): `SessionStart`, `UserPromptSubmit` and `PostToolUse`, all `"async": true`, so a
   session never waits on analytics. `scripts/record.mjs` appends one JSON line per event and does no network I/O.
-  It stops appending while the buffer is over 50 MB.
+  It refuses new events while the live file is over 50 MB.
 - **Identity** is resolved once per session (`CLAUDE_ANALYTICS_USER` → git email → OS user → `unknown`) and cached
   in `<dir>/sessions/` so later events skip the git lookups. Set `CLAUDE_ANALYTICS_*` through settings `env` or the
   real environment.
@@ -104,10 +104,26 @@ outputs, file contents, file paths or the working directory. Names are reduced t
 - **Failures**: network errors, 5xx, 429 and config-type errors (401/403/404/407/408) keep the batch on disk and
   retry with backoff (2 s doubling to 60 s), resuming after the last delivered chunk. Only 400/413/422, which Loki
   will never accept, take events out of the queue, and those are kept in `<dir>/dead/` (capped at 20 MB). The
-  backlog is capped at 50 MB, oldest evicted first. Events older than 6 days are skipped, since Loki rejects
+  held batches are capped at 50 MB, oldest evicted first (the newest batch is never evicted). Events older than 6 days are skipped, since Loki rejects
   samples older than 7. All of this is logged.
 - **Labels** are low-cardinality: `service_name`, `user`, `project`, `source`, `kind`. The JSON log line repeats
   those and adds `name`, `session_id`, and where present `subagent` and `mcp_server`.
+
+### Modules
+
+All under `plugins/usage-analytics/scripts/`. Terms are defined in [CONTEXT.md](CONTEXT.md); decisions in
+[docs/architecture-decisions/](docs/architecture-decisions/).
+
+| Module | Owns |
+|---|---|
+| `usage-event.mjs` | `toEvent(payload, context)`: kinds, names, and the allow-list that keeps content out |
+| `event-buffer.mjs` | `append` / `claim` / `batch.settle`: the live file, batches, dead/, caps, expiry, late tails |
+| `flusher-lock.mjs` | `isHeld` / `acquire`: one flusher per data dir, pid file with heartbeat |
+| `flush-once.mjs` | `flushOnce(buffer, sink)`: one pass — chunking, resume, rejection handling |
+| `drain.mjs` | the flusher loop: interval, backoff, idle exit, heartbeat before every push |
+| `loki-sink.mjs` | the Loki adapter for the sink: streams, timestamps, auth, which status codes retry |
+| `session-context.mjs`, `config.mjs`, `log.mjs` | identity and project lookup, environment variables, diagnostics |
+| `record.mjs`, `flush.mjs` | entry points: the hook, and the flusher process |
 
 ### Event kinds
 
@@ -132,6 +148,17 @@ same Loki/Mimir/Tempo (delta metrics are converted to cumulative for Mimir):
 CLAUDE_CODE_ENABLE_TELEMETRY=1 OTEL_METRICS_EXPORTER=otlp OTEL_LOGS_EXPORTER=otlp \
 OTEL_EXPORTER_OTLP_PROTOCOL=grpc OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 claude
 ```
+
+## Development
+
+```sh
+npm test                                                  # unit tests, no network, no dependencies
+SMOKE_LOKI_URL=http://localhost:3100 node --test test/smoke.test.mjs   # real hook → real Loki
+```
+
+Tests live at the module interfaces above; the buffer and lock run against temp dirs, the flusher against an
+in-memory sink, the Loki adapter against an injected `fetch`. To ship a change, bump `version` in
+`plugins/usage-analytics/.claude-plugin/plugin.json`.
 
 ## Troubleshooting
 
