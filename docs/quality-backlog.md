@@ -38,7 +38,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
 - [x] **drain test imports its collaborators like every other test.** `test/drain.test.mjs`'s last-but-one test
   dynamically imports `event-buffer`, `fs`, `os`, `path` inside the test body. Move them to top-level imports.
   _Done when:_ no `await import(` in `test/`, all tests green.
-- [ ] **Buffer file names are built in one place.** `event-buffer.mjs` spells batch, held, late, settled and tmp
+- [x] **Buffer file names are built in one place.** `event-buffer.mjs` spells batch, held, late, settled and tmp
   names with ad-hoc template strings and regexes spread over `claim`, `retire`, `sweepSettled` and `settle`
   (the `origin` regex). Collect them into one small internal naming helper so the age-order invariant in ADR 0002
   is visible in one place. No interface change. _Done when:_ the batch, `-held-`, `-late-`, `.settled-` and batch
