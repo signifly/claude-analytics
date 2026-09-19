@@ -13,6 +13,18 @@ are satisfied. Write the naming helper and the "how it works" page against the p
 `bash -c 'pids=; for i in 1 2 3 4; do (while :; do :; done) & pids="$pids $!"; done; log=$(mktemp); trap "exec 2>/dev/null; kill $pids; rm -f $log" EXIT; ok=0; for i in $(seq 10); do node --test test/multi-process.test.mjs >"$log" 2>&1 && ok=$((ok+1)) || tail -40 "$log"; done; echo "$ok/10"'`
 prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `bash -c`: zsh does not word-split `$pids`).
 
+## Audit 2 (2026-09-19, main at 826906c)
+
+All phase 1–4 items above are done. A fresh audit found one item worth a PR and one decision for Emil
+(the plugin version, under Questions).
+
+- [x] **The hook's buffer diagnostics are throttled like its other messages.** `record-main.mjs` hands `openBuffer`
+  the uncapped `log`; the buffer's once-per-kind suppression lasts one process, and each hook event is a new
+  process, so an unreadable data dir writes a `cannot stat events.jsonl` line on every event (reproduced: 5 events,
+  5 lines), against `docs/how-it-works.mdx` and pushing the once-an-hour `record failed` line out through rotation.
+  Route the buffer's log through `logOnce`. _Done when:_ a test in `test/record.test.mjs` (skipped as root) runs the
+  hook several times against an unreadable data dir and finds at most one `cannot stat` line, and fails before the fix.
+
 ## Phase 1: code quality
 
 - [x] **Session cache retention belongs to session-context.** `flush.mjs` defines `SESSION_CACHE_MS` and passes it
@@ -115,6 +127,13 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   chunk was flushed (outages, batches held for hours) may be counted twice. Worth checking against the stack: push an
   event, force a flush (`POST /flush`), push it again, and count it with a query. If duplicates survive, options are
   query-side dedup in the dashboard or accepting the overcount. Found in review of #18.
+
+- **Release the plugin?** `plugins/usage-analytics/.claude-plugin/plugin.json` is still `0.4.1`, but 8 commits since
+  have changed plugin runtime code, including a real fix (#11: one vanished session file no longer ends the whole
+  prune) and the refactors of this loop. Until the version is bumped, `claude plugin update` delivers none of it, and
+  "0.4.1" installs made at different times run different code. Bumping publishes to every installed user, so it is
+  left to you; a CI check that fails when plugin runtime files change without a version bump would stop this
+  recurring. Found in audit 2.
 
 ## Parked
 
