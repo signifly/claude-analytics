@@ -42,7 +42,7 @@ All phase 1–4 items above are done. A fresh audit found one item worth a PR an
   read-only data dir, `pending()` is false after a failed claim and true again after a new append, repeated claims
   log once, a drain with the real buffer goes idle (tests skipped as root, failing before the fix), and the loaded
   run passes.
-- [ ] **A log that cannot rotate stops growing.** `log.mjs` swallows a failed rotation and appends anyway, so a
+- [x] **A log that cannot rotate stops growing.** `log.mjs` swallows a failed rotation and appends anyway, so a
   `flusher.log` in a data dir that is not writable grows past its cap and never falls back (reproduced: 7439 bytes
   against a 300-byte cap), against `docs/how-it-works.mdx`. _Done when:_ with an over-cap `flusher.log` in a
   read-only data dir, the file does not grow and later lines land in the capped fallback (test skipped as root,
