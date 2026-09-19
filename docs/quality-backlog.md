@@ -81,9 +81,10 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
 - [x] pnpm workspaces: root `pnpm-workspace.yaml` with `plugins/*`, plugin `package.json` (zero deps, no build),
   lockfile; `pnpm test` / `pnpm check` work; CI still on npm scripts. ADR for the move.
   _Done when:_ `pnpm install && pnpm test && pnpm check` pass from a clean clone and the ADR is in `docs/architecture-decisions/`.
-- [ ] turbo: `turbo.json` with `test`, `check`, `build`; root scripts delegate to turbo.
+- [x] turbo: `turbo.json` with `test`, `check`, `build`; root scripts delegate to turbo.
   _Done when:_ `pnpm turbo run test check build` passes locally with the plugin's tasks included.
-- [ ] CI runs through turbo. _Done when:_ every CI step that ran an npm script runs it through turbo, and CI is green on the PR.
+- [x] CI runs through turbo. Done together with the turbo item in one PR: once the root scripts call turbo, a CI
+  that runs `npm test` without installing breaks, so the two cannot land separately and leave `main` working. _Done when:_ every CI step that ran an npm script runs it through turbo, and CI is green on the PR.
 
 ## Phase 4: docs app
 

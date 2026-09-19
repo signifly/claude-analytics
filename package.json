@@ -5,7 +5,12 @@
   "packageManager": "pnpm@10.34.5",
   "engines": { "node": ">=18" },
   "scripts": {
-    "test": "node --test test/*.test.mjs",
-    "check": "for f in plugins/usage-analytics/scripts/*.mjs; do node --check \"$f\" || exit 1; done"
+    "build": "turbo run build",
+    "check": "turbo run check",
+    "test": "turbo run test test:root",
+    "test:root": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "turbo": "2.11.2"
   }
 }
