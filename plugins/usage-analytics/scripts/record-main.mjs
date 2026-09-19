@@ -3,7 +3,6 @@
 // Loaded by record.mjs, which guarantees the exit-0-and-silent contract.
 import { spawn } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.mjs";
@@ -13,16 +12,8 @@ import { createLog, describe } from "./log.mjs";
 import { sessionContext } from "./session-context.mjs";
 import { toEvent } from "./usage-event.mjs";
 
-function startFlusher(logFile, log) {
+function startFlusher(stderr, log) {
   const flusher = path.join(path.dirname(fileURLToPath(import.meta.url)), "flush.mjs");
-  // The flusher's stderr goes to the log, so a crash before it can log for itself leaves a trace.
-  let stderr = "ignore";
-  for (const target of [logFile, path.join(os.tmpdir(), "claude-analytics.log")]) {
-    try {
-      stderr = fs.openSync(target, "a");
-      break;
-    } catch {}
-  }
   const child = spawn(process.execPath, [flusher], { detached: true, stdio: ["ignore", "ignore", stderr] });
   // Spawn failures are asynchronous: without this they'd crash the hook.
   child.on("error", (err) => log(`flusher spawn failed: ${describe(err)}`));
@@ -33,7 +24,7 @@ function main() {
   const config = loadConfig();
   if (config.disabled) return;
   const dir = config.dataDir;
-  const { file: logFile, log, logOnce } = createLog(dir);
+  const { log, logOnce, stderrTarget } = createLog(dir);
   try {
     for (const warning of config.warnings) logOnce(`config-${warning.slice(0, 40)}`, warning);
 
@@ -50,7 +41,7 @@ function main() {
     if (!event) return;
 
     if (!openBuffer(dir, { log }).append(event)) logOnce("buffer-full", "live file is over its size cap, refusing new events until the flusher claims it");
-    if (!isHeld(dir) && spawnAllowed(dir)) startFlusher(logFile, log);
+    if (!isHeld(dir) && spawnAllowed(dir)) startFlusher(stderrTarget(), log);
   } catch (err) {
     // Analytics must never surface errors into a session; leave a trace instead
     // (throttled: a broken data dir would otherwise log on every hook event).

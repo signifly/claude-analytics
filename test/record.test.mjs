@@ -39,6 +39,18 @@ test("a tool-use payload is appended to the live file, silently", () => {
   assert.match(fs.readFileSync(path.join(dir, files[0]), "utf8"), /"kind":"tool","name":"Read","user":"test"/);
 });
 
+test("a hook event starts a flusher when none is running", async () => {
+  const dir = tmpDir();
+  silent(runHook(payload(), { CLAUDE_ANALYTICS_DIR: dir }));
+  const log = path.join(dir, "flusher.log");
+  let started = false;
+  for (let waited = 0; waited < 5000 && !started; waited += 50) {
+    started = fs.existsSync(log) && /flusher started/.test(fs.readFileSync(log, "utf8"));
+    if (!started) await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.ok(started, "no flusher started");
+});
+
 const blockedParent = () => {
   const file = path.join(tmpDir(), "a-file");
   fs.writeFileSync(file, "");
