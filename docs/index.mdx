@@ -23,7 +23,7 @@ file paths never leave the machine; the project is identified by the repo or fol
 
 ```
 Claude Code hooks ──append──▶ ~/.claude/analytics/events.jsonl ──flusher (1s batches)──▶ Loki ──▶ Grafana
-(async, no network)            shared, append-only buffer         one process per buffer dir
+(async, no network)            shared, append-only buffer         one process per data dir
 ```
 
 ## Where to go next

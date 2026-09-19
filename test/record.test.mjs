@@ -75,3 +75,18 @@ test("when recording is switched off, nothing is created and nothing is started"
   silent(runHook(payload(), { CLAUDE_ANALYTICS_DIR: dir, CLAUDE_ANALYTICS_DISABLED: "1" }));
   assert.equal(fs.existsSync(dir), false);
 });
+
+test("an unreadable data dir leaves one line per kind of problem, not one per hook event", { skip: process.getuid?.() === 0 && "root ignores permissions" }, () => {
+  const dir = path.join(tmpDir(), "analytics");
+  fs.mkdirSync(dir);
+  fs.chmodSync(dir, 0o000);
+  const fallback = tmpDir(); // the log falls back to $TMPDIR when the data dir is unusable
+  try {
+    for (let i = 0; i < 5; i++) silent(runHook(payload(), { CLAUDE_ANALYTICS_DIR: dir, TMPDIR: fallback }));
+  } finally {
+    fs.chmodSync(dir, 0o755);
+  }
+  const log = fs.readFileSync(path.join(fallback, "claude-analytics.log"), "utf8");
+  assert.equal(log.split("\n").filter((l) => l.includes("cannot stat")).length, 1, log);
+  assert.match(log, /record failed/);
+});

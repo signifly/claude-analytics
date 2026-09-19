@@ -40,7 +40,12 @@ function main() {
     const event = toEvent(payload, context);
     if (!event) return;
 
-    if (!openBuffer(dir, { log }).append(event)) logOnce("buffer-full", "live file is over its size cap, refusing new events until the flusher claims it");
+    // Each hook event is a new process, so the buffer's own once-per-process
+    // suppression does not help here: throttle its messages per kind instead. The
+    // key is the text before the first colon, which names the kind for append()'s
+    // messages (the only ones the hook can trigger).
+    const bufferLog = (msg) => logOnce(`buffer-${String(msg).split(":")[0].slice(0, 60)}`, msg);
+    if (!openBuffer(dir, { log: bufferLog }).append(event)) logOnce("buffer-full", "live file is over its size cap, refusing new events until the flusher claims it");
     if (mayStartFlusher(dir)) startFlusher(stderrTarget(), log);
   } catch (err) {
     // Analytics must never surface errors into a session; leave a trace instead
