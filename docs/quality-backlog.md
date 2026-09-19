@@ -38,7 +38,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
 - [x] **drain test imports its collaborators like every other test.** `test/drain.test.mjs`'s last-but-one test
   dynamically imports `event-buffer`, `fs`, `os`, `path` inside the test body. Move them to top-level imports.
   _Done when:_ no `await import(` in `test/`, all tests green.
-- [ ] **Buffer file names are built in one place.** `event-buffer.mjs` spells batch, held, late, settled and tmp
+- [x] **Buffer file names are built in one place.** `event-buffer.mjs` spells batch, held, late, settled and tmp
   names with ad-hoc template strings and regexes spread over `claim`, `retire`, `sweepSettled` and `settle`
   (the `origin` regex). Collect them into one small internal naming helper so the age-order invariant in ADR 0002
   is visible in one place. No interface change. _Done when:_ the batch, `-held-`, `-late-`, `.settled-` and batch
@@ -46,7 +46,8 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   existing tests in `test/event-buffer.test.mjs` pass without modification; a new table test pins that each
   helper-produced name is byte-identical to the pre-refactor format and that pre-refactor names parse; and the
   loaded run passes.
-  *(after #3, which changes held naming)*
+  *(after #3, which changes held naming)* Done in #10. The helper is module-private, so the format is pinned through
+  `openBuffer` rather than by a table test of the helper itself.
 - [ ] **One vanished session file does not end the whole prune.** In `pruneSessions` a single `statSync` that
   hits ENOENT (a hook's `.tmp` renamed away between `readdirSync` and `statSync`) throws out of the loop, is
   swallowed as "no cache", and skips every remaining file until the next flusher start. Handle each file on its

@@ -404,3 +404,54 @@ test("a late write that cannot be recovered does not count as pending forever", 
   }
   assert.deepEqual(names(buffer.claim()), ["late"]); // …but still delivered once the dir is writable again
 });
+
+// The file names are a stored format: a newer plugin must pick up what an older one left behind.
+test("buffer files keep their on-disk names: claimed, held, settled and late", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  const pid = process.pid;
+  const listing = () => fs.readdirSync(dir).sort();
+  for (const n of ["a", "b", "c"]) buffer.append(event(n));
+  const claimedBytes = fs.statSync(path.join(dir, "events.jsonl")).size;
+  let [batch] = buffer.claim();
+  assert.deepEqual(listing(), [`batch-${NOW}-${pid}-000000.jsonl`]);
+
+  const slowWriter = fs.openSync(path.join(dir, `batch-${NOW}-${pid}-000000.jsonl`), "a");
+  batch.settle({ handled: 1 });
+  assert.deepEqual(listing(), [
+    `batch-${NOW}-${pid}-000000-held-${pid}-0.jsonl`,
+    `batch-${NOW}-${pid}-000000.jsonl.settled-${claimedBytes}-${pid}-0`,
+  ]);
+
+  fs.writeSync(slowWriter, JSON.stringify(event("late")) + "\n");
+  fs.closeSync(slowWriter);
+  const lateBytes = Buffer.byteLength(JSON.stringify(event("late")) + "\n");
+  [batch] = buffer.claim();
+  assert.deepEqual(listing(), [
+    `batch-${NOW}-${pid}-000000-held-${pid}-0.jsonl`,
+    `batch-${NOW}-${pid}-000000-late-${pid}-0-${String(claimedBytes).padStart(12, "0")}.jsonl`,
+    `batch-${NOW}-${pid}-000000.jsonl.settled-${claimedBytes + lateBytes}-${pid}-0`,
+  ]);
+
+  batch.settle({ handled: 1 }); // the held rest, partly settled again: still one "-held-" segment
+  const heldBytes = claimedBytes - Buffer.byteLength(JSON.stringify(event("a")) + "\n");
+  const heldSettled = `batch-${NOW}-${pid}-000000-held-${pid}-0.jsonl.settled-${heldBytes}-${pid}-1`;
+  assert.deepEqual(listing(), [
+    heldSettled,
+    `batch-${NOW}-${pid}-000000-held-${pid}-1.jsonl`,
+    `batch-${NOW}-${pid}-000000-late-${pid}-0-${String(claimedBytes).padStart(12, "0")}.jsonl`,
+    `batch-${NOW}-${pid}-000000.jsonl.settled-${claimedBytes + lateBytes}-${pid}-0`,
+  ]);
+});
+
+test("files left by an earlier run are read under their names: settled with late bytes, held, and their dead/ origin", () => {
+  const dir = tmpDir();
+  fs.writeFileSync(path.join(dir, "batch-1690000000000-11-000003.jsonl.settled-0-11-7"), JSON.stringify(event("late-from-before")) + "\n");
+  fs.writeFileSync(path.join(dir, "batch-1690000000000-11-000003-held-11-4.jsonl"), JSON.stringify(event("held-from-before")) + "\n");
+  const buffer = open(dir);
+  const batches = buffer.claim();
+  assert.deepEqual(names(batches), ["held-from-before", "late-from-before"]);
+  assert.ok(fs.readdirSync(dir).includes("batch-1690000000000-11-000003-late-11-7-000000000000.jsonl"));
+  for (const batch of batches) batch.settle({ rejected: batch.events });
+  assert.deepEqual(fs.readdirSync(path.join(dir, "dead")), ["rejected-batch-1690000000000-11-000003.jsonl"]);
+});
