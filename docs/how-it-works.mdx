@@ -17,7 +17,7 @@ All three are `"async": true`, so a session never waits on analytics.
 Each hook runs `scripts/record.mjs`, which:
 
 1. reads the hook payload from stdin and turns it into at most one usage event (see
-   [What is recorded](what-is-recorded.mdx));
+   [What is recorded](./what-is-recorded.mdx));
 2. appends that event as one JSON line to the **live file**, `events.jsonl`, and does no network I/O;
 3. starts a flusher if none is running, at most once every 5 seconds.
 
@@ -46,7 +46,7 @@ held batch to Loki's `/loki/api/v1/push`, oldest first, in chunks of about 1 MiB
 It exits after 10 minutes (by default) in which no new events arrived and no events left the buffer. Held
 batches during an outage do not keep it alive; the next hook event starts a new flusher that retries them. Why
 the flusher is started this way, rather than run as a daemon, is in
-[ADR 0004](architecture-decisions/0004-flusher-spawned-on-demand.mdx).
+[ADR 0004](./architecture-decisions/0004-flusher-spawned-on-demand.mdx).
 
 ## When delivery fails
 
@@ -73,11 +73,11 @@ batch the flusher has already claimed, or even settled. The buffer catches both 
 
 A settled batch is removed once it has gone the **grace period** (5 s) without any write. The details, and the one
 case in which a stalled writer can still lose an event, are in
-[ADR 0002](architecture-decisions/0002-append-only-file-buffer.mdx).
+[ADR 0002](./architecture-decisions/0002-append-only-file-buffer.mdx).
 
 No step in this sequence loses events if it fails or the process dies. The worst case is a batch pushed twice,
 and a retried event carries the same timestamp and line, which Loki drops as a duplicate at least while the original
-is in its open chunk ([ADR 0005](architecture-decisions/0005-retry-stable-event-timestamps.mdx)).
+is in its open chunk ([ADR 0005](./architecture-decisions/0005-retry-stable-event-timestamps.mdx)).
 
 ## Modules
 

@@ -26,7 +26,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check # turbo run check
       - run: pnpm test # turbo run test test:root
-      - run: pnpm build # turbo run build
+      - run: pnpm build # turbo run build (the docs app needs Node 20.9+, as Next.js does)
+        if: matrix.node != 18
 
   stack:
     runs-on: ubuntu-latest

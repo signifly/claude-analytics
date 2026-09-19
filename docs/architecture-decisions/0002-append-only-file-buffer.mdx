@@ -35,7 +35,7 @@ become `<batch>-late-<id>-<seen>.jsonl`. It is removed once it has gone 5 s with
 late writes, late writes in the order they were written. Settled files are short-lived copies
 and sit outside the 50 MB cap. No step in this sequence can lose events if it fails or the process dies; the worst
 case is a batch pushed twice, which Loki deduplicates at least while the original is in the ingester's open chunk
-([0005](0005-retry-stable-event-timestamps.mdx)). See the late-write consequence below.
+([0005](./0005-retry-stable-event-timestamps.mdx)). See the late-write consequence below.
 
 ## Consequences
 

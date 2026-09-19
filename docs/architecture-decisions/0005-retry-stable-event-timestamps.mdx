@@ -14,7 +14,7 @@ Accepted
 
 ## Context
 
-[ADR 0002](0002-append-only-file-buffer.mdx) accepts that a batch can be pushed twice: every failure path in the
+[ADR 0002](./0002-append-only-file-buffer.mdx) accepts that a batch can be pushed twice: every failure path in the
 event buffer prefers pushing again over losing events. That is only safe if Loki recognises the second copy.
 
 Loki's documentation says the ingester ignores an entry whose nanosecond timestamp and line are both identical to
@@ -26,10 +26,10 @@ Forces:
 
 - A re-pushed event must have exactly the timestamp and line of the first push, or it is counted twice.
 - Two events that really did happen must not collapse into one. The log line holds only names and the session
-  context ([ADR 0003](0003-record-names-never-content.mdx)), so two uses of the same tool in the same session within
+  context ([ADR 0003](./0003-record-names-never-content.mdx)), so two uses of the same tool in the same session within
   one millisecond produce identical lines.
 - JavaScript's clock has millisecond resolution, and Loki timestamps are in nanoseconds.
-- Several hook processes write concurrently, with no shared counter and no lock ([ADR 0002](0002-append-only-file-buffer.mdx)).
+- Several hook processes write concurrently, with no shared counter and no lock ([ADR 0002](./0002-append-only-file-buffer.mdx)).
 
 ## Decision
 

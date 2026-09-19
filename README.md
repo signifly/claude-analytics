@@ -40,6 +40,7 @@ Terms are defined in [CONTEXT.md](CONTEXT.md), the glossary.
 pnpm install                                              # turbo; the plugin itself has no dependencies
 pnpm test                                                 # unit tests, no network (turbo run test test:root)
 pnpm check                                                # syntax-check the plugin scripts (turbo run check)
+pnpm --filter docs dev                                    # the docs site on http://localhost:3000, from docs/ (Node 20.9+)
 SMOKE_LOKI_URL=http://localhost:3100 node --test test/smoke.test.mjs   # real hook → real Loki
 ```
 

@@ -14,7 +14,7 @@ Accepted
 
 ## Context
 
-Hooks only append to the event buffer ([0002](0002-append-only-file-buffer.mdx)); something else has to move the
+Hooks only append to the event buffer ([0002](./0002-append-only-file-buffer.mdx)); something else has to move the
 events to Loki. That process has to exist on every developer machine and in every agent container, including
 Sandcastle containers that live for a single run. The plugin marketplace installs files, not services, and the plugin
 has no dependencies.
@@ -57,7 +57,7 @@ it was shutting down saw a live flusher and started nothing; if there is one, it
   `CLAUDE_ANALYTICS_LOKI_*` settings share whichever flusher is running.
 - Each hook event pays for a lock check, and occasionally a process spawn.
 - Correctness depends on the pid-based lock, which is why a data dir must not be shared across containers
-  ([0002](0002-append-only-file-buffer.mdx)).
+  ([0002](./0002-append-only-file-buffer.mdx)).
 
 ## Alternatives Considered
 
@@ -74,5 +74,5 @@ events still held.
 
 ### Flushing from the hook itself
 
-**Rejected because**: it puts network I/O back into the hook, which [0001](0001-hooks-and-local-buffer-over-native-telemetry.mdx)
+**Rejected because**: it puts network I/O back into the hook, which [0001](./0001-hooks-and-local-buffer-over-native-telemetry.mdx)
 rules out. An async hook still runs a process per event, and every network problem would become a hook problem.
