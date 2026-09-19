@@ -23,7 +23,7 @@ All phase 1–4 items above are done. A fresh audit found one item worth a PR an
   process, so an unreadable data dir writes a `cannot stat events.jsonl` line on every event (reproduced: 5 events,
   5 lines), against `docs/how-it-works.mdx` and pushing the once-an-hour `record failed` line out through rotation.
   Route the buffer's log through `logOnce`. _Done when:_ a test in `test/record.test.mjs` (skipped as root) runs the
-  hook several times against an unreadable data dir and finds at most one `cannot stat` line, and fails before the fix.
+  hook several times against an unreadable data dir and finds exactly one `cannot stat` line, and fails before the fix.
 
 ## Phase 1: code quality
 

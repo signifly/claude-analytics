@@ -87,6 +87,6 @@ test("an unreadable data dir leaves one line per kind of problem, not one per ho
     fs.chmodSync(dir, 0o755);
   }
   const log = fs.readFileSync(path.join(fallback, "claude-analytics.log"), "utf8");
-  assert.ok(log.split("\n").filter((l) => l.includes("cannot stat")).length <= 1, log);
+  assert.equal(log.split("\n").filter((l) => l.includes("cannot stat")).length, 1, log);
   assert.match(log, /record failed/);
 });
