@@ -70,7 +70,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   _Done when:_ README is at most 60 lines and every section it dropped lives in a docs page.
 - [x] ADR (via /architect:adr): the flusher is spawned on demand by hooks and exits when idle, rather than a
   daemon (launchd/systemd) or a flusher per session. _Done when:_ the ADR is in `docs/architecture-decisions/`.
-- [ ] ADR (via /architect:adr): why events carry `sub` (retry-stable nanosecond timestamps). ADR 0002 already
+- [x] ADR (via /architect:adr): why events carry `sub` (retry-stable nanosecond timestamps). ADR 0002 already
   relies on Loki deduplicating re-pushes; this one records the timestamp scheme that makes that true and
   references 0002 rather than re-deciding it. _Done when:_ the ADR is in `docs/architecture-decisions/`, links
   ADRs 0002 and 0003, and matches `loki-sink.mjs` (ms timestamp plus `sub` padded to 6 digits; the index fallback
