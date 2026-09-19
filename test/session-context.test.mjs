@@ -111,3 +111,15 @@ test("a session cache that cannot be pruned is logged, not thrown", () => {
   pruneSessions(dir, { log: (l) => lines.push(l) });
   assert.match(lines.join("\n"), /cannot prune session cache/);
 });
+
+test("a session file that vanishes during pruning does not stop the rest being pruned", () => {
+  const dir = tmpDir();
+  for (const id of ["old-1", "old-2", "old-3", "old-4"]) cacheSession(dir, id, 6 * DAY + HOUR);
+  // A dangling symlink stands in for a hook's temp file renamed away between listing and stat.
+  fs.symlinkSync(path.join(dir, "gone"), path.join(dir, "sessions", "a-vanished.json.123.tmp"));
+  fs.symlinkSync(path.join(dir, "gone"), path.join(dir, "sessions", "z-vanished.json.123.tmp"));
+  const lines = [];
+  pruneSessions(dir, { log: (l) => lines.push(l) });
+  assert.deepEqual(cachedSessions(dir).filter((f) => f.endsWith(".json")), []);
+  assert.deepEqual(lines, []);
+});

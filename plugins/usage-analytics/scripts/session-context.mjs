@@ -78,7 +78,9 @@ export function pruneSessions(dir, { maxAgeMs = SESSION_CACHE_MS, log = () => {}
     const cutoff = Date.now() - maxAgeMs;
     for (const name of fs.readdirSync(sessionsDir)) {
       const file = path.join(sessionsDir, name);
-      if (fs.statSync(file).mtimeMs < cutoff) fs.rmSync(file, { force: true });
+      // A hook can rename its temp file away between the listing and here.
+      const info = fs.statSync(file, { throwIfNoEntry: false });
+      if (info && info.mtimeMs < cutoff) fs.rmSync(file, { force: true });
     }
   } catch (err) {
     if (err?.code !== "ENOENT") log(`cannot prune session cache: ${describe(err)}`);
