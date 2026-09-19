@@ -31,7 +31,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   `mayStartFlusher(dir)` to `flusher-lock.mjs` that owns the order; keep `isHeld`/`spawnAllowed` exported for
   their existing tests. _Done when:_ `record-main.mjs` makes one lock call and a test pins that a held lock does
   not touch the throttle marker.
-- [ ] **Glossary covers the terms the code uses.** `CONTEXT.md` has no entry for *backlog* (used in
+- [x] **Glossary covers the terms the code uses.** `CONTEXT.md` has no entry for *backlog* (used in
   `maxBacklogBytes` and the "backlog over N bytes" log line, and covering both the live file cap and held
   batches), *data dir*, *claim*, *grace period*, or *push*. Add them, glossary-only, no implementation detail.
   _Done when:_ `CONTEXT.md` has entries for backlog, data dir, claim, grace period and push.
