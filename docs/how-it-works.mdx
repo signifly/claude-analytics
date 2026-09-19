@@ -22,8 +22,8 @@ Each hook runs `scripts/record.mjs`, which:
 3. starts a flusher if none is running, at most once every 5 seconds.
 
 Whatever happens, the hook exits 0 and prints nothing, even if the plugin is half-updated and its modules fail to
-load. Problems go to the log instead (see [Troubleshooting](#troubleshooting)). The live file refuses new events
-while it is over 50 MB.
+load. Problems go to the log instead (see [Troubleshooting](#troubleshooting)); only a failure to load the
+plugin's own modules is silent. The live file refuses new events while it is over 50 MB.
 
 The identity tag and project are resolved once per session and cached under `<data dir>/sessions/`, so later
 events skip the git lookups. If git itself fails (missing, timing out), the fallback answer is cached for only
@@ -42,8 +42,8 @@ Every flush interval (1 s by default) the flusher **claims** the live file by re
 file; writers reopen the path for every event, so new events land in a fresh live file. It then **pushes** every
 held batch to Loki's `/loki/api/v1/push`, oldest first, in chunks of about 1 MiB, and **settles** each one.
 
-It exits after 10 minutes in which no new events arrived and no events left the buffer. Held batches during an
-outage do not keep it alive; the next hook event starts a new flusher that retries them.
+It exits after 10 minutes (by default) in which no new events arrived and no events left the buffer. Held
+batches during an outage do not keep it alive; the next hook event starts a new flusher that retries them.
 
 ## When delivery fails
 
@@ -56,9 +56,9 @@ outage do not keep it alive; the next hook event starts a new flusher that retri
 | Events older than 6 days | Skips them, since Loki rejects samples older than 7 days. |
 | Unparseable lines (e.g. a torn write) | Skips them and counts them in the log. |
 
-The **backlog** is capped: held batches over 50 MB lose their oldest first (the newest is never evicted), and
-`dead/` is capped at 20 MB, oldest-modified first. Every one of these outcomes leaves a line in the log. Events
-only ever leave the buffer undelivered with a log line.
+The **backlog** is capped: held batches over 50 MB lose their oldest first (the newest is never evicted).
+`dead/` is capped separately at 20 MB, oldest-modified first. Every one of these outcomes leaves a line in the
+log. Events only ever leave the buffer undelivered with a log line.
 
 ## Late writes
 
@@ -101,7 +101,8 @@ sink, and the Loki adapter against an injected `fetch`.
 - `~/.claude/analytics/flusher.log` records flusher start and exit, lost or taken-over locks, config warnings,
   failed and recovered pushes with their cause, rejected events, evictions, skipped lines, a full live file, and
   the flusher's stderr if it crashes. It rotates to `.log.1` at 1 MB. If the data dir is not writable, it falls
-  back to `$TMPDIR/claude-analytics.log`, with the same cap. Hook-side messages are limited to one per kind per
-  hour.
+  back to `$TMPDIR/claude-analytics.log`, with the same cap. Most hook-side messages are limited to one per kind
+  per hour.
 - Leftover `batch-*.jsonl` files mean Loki was unreachable or misconfigured. The next flusher retries them.
 - Nothing arriving and no log at all usually means `node` is not on the `PATH` that Claude Code hooks run with.
+  It can also mean `CLAUDE_ANALYTICS_DISABLED` is set, or a half-updated plugin whose modules fail to load.

@@ -8,7 +8,8 @@ developer sessions and autonomous (Sandcastle) agents. This repo hosts both halv
   with a provisioned "Claude Code usage" dashboard.
 
 Documentation lives in [`docs/`](docs/): start with [what it is](docs/index.mdx), [install](docs/install.mdx),
-[what is recorded](docs/what-is-recorded.mdx) and [how it works](docs/how-it-works.mdx).
+[what is recorded](docs/what-is-recorded.mdx), [how it works](docs/how-it-works.mdx) and
+[operating the stack](docs/operating-the-stack.mdx).
 
 ```
 Claude Code hooks ──append──▶ ~/.claude/analytics/events.jsonl ──flusher (1s batches)──▶ Loki ──▶ Grafana
