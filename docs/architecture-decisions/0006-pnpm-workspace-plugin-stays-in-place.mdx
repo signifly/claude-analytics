@@ -31,8 +31,8 @@ Forces:
 
 Make the repo a pnpm workspace. `pnpm-workspace.yaml` lists `plugins/*`, so the plugin is a workspace package
 without moving. It gets a `package.json` with no dependencies and only a `check` script. The root `package.json`
-pins the package manager (`pnpm@10.34.5`, which supports Node 18.12 and newer) and keeps the tests, which exercise the plugin
-from the outside.
+pins the package manager (`pnpm@10.34.5`, which supports Node 18.12 and newer) and keeps the tests, which exercise
+the plugin from the outside.
 
 Turborepo follows in separate steps: a `turbo.json` with `test`, `check` and `build` tasks, then CI running through
 it. Each step leaves `main` working, and the root npm scripts keep working until CI has moved.
