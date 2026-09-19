@@ -16,7 +16,7 @@ is the `origin` remote's repo name, else the git root's folder name, else the wo
 `unknown`.
 
 This is enforced in one place, as an allow-list applied when the event is built, and pinned by tests. The
-reasoning is in [ADR 0003](architecture-decisions/0003-record-names-never-content.mdx).
+reasoning is in [ADR 0003](./architecture-decisions/0003-record-names-never-content.mdx).
 
 ## The fields of an event
 
@@ -58,10 +58,10 @@ How a skill typed as a slash command is counted is part of **Kind** in the gloss
   and where present `session_id`, `subagent` and `mcp_server`.
 - **The entry's timestamp** is `ts` in nanoseconds, with `sub` as the sub-millisecond digits. A retried push sends
   the same timestamp and line, which Loki treats as a duplicate, at least while the original is in its open chunk
-  ([ADR 0005](architecture-decisions/0005-retry-stable-event-timestamps.mdx)).
+  ([ADR 0005](./architecture-decisions/0005-retry-stable-event-timestamps.mdx)).
 
 Skill runs per person over the last week:
 
-```logql
+```text
 sum by (name, user) (count_over_time({service_name="claude-code-usage", kind="skill"} | json name="name" [7d]))
 ```

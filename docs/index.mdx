@@ -11,7 +11,7 @@ skills, slash commands, tools, MCP tools and subagents that run in developer ses
 
 It records **names, never content**. Prompt text, command arguments, tool inputs and outputs, file contents and
 file paths never leave the machine; the project is identified by the repo or folder *name*, never its path.
-[What is recorded](what-is-recorded.mdx) shows the exact event shape.
+[What is recorded](./what-is-recorded.mdx) shows the exact event shape.
 
 ## The two halves
 
@@ -28,13 +28,13 @@ Claude Code hooks ──append──▶ ~/.claude/analytics/events.jsonl ──f
 
 ## Where to go next
 
-- [Install](install.mdx): add the plugin for yourself, a team repo, or an agent, and configure it.
-- [What is recorded](what-is-recorded.mdx): the fields of a usage event, its kinds, and how it looks in Loki.
-- [How it works](how-it-works.mdx): hooks, the event buffer, the flusher, what happens when delivery fails, and
+- [Install](./install.mdx): add the plugin for yourself, a team repo, or an agent, and configure it.
+- [What is recorded](./what-is-recorded.mdx): the fields of a usage event, its kinds, and how it looks in Loki.
+- [How it works](./how-it-works.mdx): hooks, the event buffer, the flusher, what happens when delivery fails, and
   troubleshooting.
-- [Operating the stack](operating-the-stack.mdx): running it, serving a team, retention, the dashboard and native
+- [Operating the stack](./operating-the-stack.mdx): running it, serving a team, retention, the dashboard and native
   telemetry.
-- [Architecture decisions](architecture-decisions/0001-hooks-and-local-buffer-over-native-telemetry.mdx): why it was
+- [Architecture decisions](./architecture-decisions/0001-hooks-and-local-buffer-over-native-telemetry.mdx): why it was
   built this way.
 
 Terms such as *usage event*, *event buffer*, *batch* and *flusher* are defined in the

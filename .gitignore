@@ -4,3 +4,6 @@
 .claude/analytics/
 node_modules/
 .turbo/
+apps/docs/.next/
+apps/docs/next-env.d.ts
+*.tsbuildinfo

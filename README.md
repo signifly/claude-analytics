@@ -7,6 +7,7 @@ developer sessions and autonomous (Sandcastle) agents. It records names, never c
   buffer; a background flusher ships the buffer to Loki.
 - **`docker-compose.yml` and `stack/`** run Loki, Grafana, Tempo, Mimir and an OpenTelemetry collector, with a
   provisioned "Claude Code usage" dashboard.
+- **`apps/docs/`** is the documentation site, built with Fumadocs from `docs/` (Node 20.9+ for `pnpm build`).
 
 ```
 Claude Code hooks ──append──▶ ~/.claude/analytics/events.jsonl ──flusher (1s batches)──▶ Loki ──▶ Grafana
@@ -40,6 +41,7 @@ Terms are defined in [CONTEXT.md](CONTEXT.md), the glossary.
 pnpm install                                              # turbo; the plugin itself has no dependencies
 pnpm test                                                 # unit tests, no network (turbo run test test:root)
 pnpm check                                                # syntax-check the plugin scripts (turbo run check)
+pnpm --filter docs dev                                    # the docs site on http://localhost:3000, from docs/ (Node 20.9+)
 SMOKE_LOKI_URL=http://localhost:3100 node --test test/smoke.test.mjs   # real hook → real Loki
 ```
 

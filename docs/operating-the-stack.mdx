@@ -31,7 +31,7 @@ containers, set `BIND_ADDRESS=0.0.0.0`. Before you do:
 - set a real admin password with `GRAFANA_ADMIN_PASSWORD`;
 - set `GRAFANA_ANONYMOUS=false`, since anonymous viewers are on by default;
 - put Loki behind auth. It has none of its own. The plugin's flusher can send a bearer token, basic auth and a
-  tenant header (see [Install](install.mdx#configuration));
+  tenant header (see [Install](./install.mdx#configuration));
 - keep the OTLP ports (4317/4318) on loopback or behind auth too. The collector has no auth and writes whatever it
   receives into Loki, Mimir and Tempo, so an open OTLP port gets around any auth in front of Loki.
 
@@ -50,7 +50,7 @@ If you lower Loki's `reject_old_samples_max_age`, lower `maxAgeMs` in
 ## The dashboard
 
 The "Claude Code usage" dashboard is provisioned from `stack/grafana/dashboards/`. Edit the JSON there: the
-provisioned dashboard cannot be saved from the Grafana UI. [What is recorded](what-is-recorded.mdx) describes the
+provisioned dashboard cannot be saved from the Grafana UI. [What is recorded](./what-is-recorded.mdx) describes the
 labels and log lines to query.
 
 ## Native Claude Code telemetry (optional)
@@ -64,7 +64,7 @@ OTEL_EXPORTER_OTLP_PROTOCOL=grpc OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:43
 ```
 
 This runs alongside the plugin; it does not replace it. See
-[ADR 0001](architecture-decisions/0001-hooks-and-local-buffer-over-native-telemetry.mdx) for why.
+[ADR 0001](./architecture-decisions/0001-hooks-and-local-buffer-over-native-telemetry.mdx) for why.
 
 ## Checking that events arrive
 
@@ -76,4 +76,4 @@ This runs alongside the plugin; it does not replace it. See
   ```
 
 - If events do not show up, the plugin's log explains why. See
-  [Troubleshooting](how-it-works.mdx#troubleshooting).
+  [Troubleshooting](./how-it-works.mdx#troubleshooting).

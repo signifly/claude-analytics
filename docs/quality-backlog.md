@@ -89,7 +89,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
 
 ## Phase 4: docs app
 
-- [ ] `apps/docs` on Fumadocs reading repo-root `docs/` as content (check Fumadocs + Turborepo docs via Context7
+- [x] `apps/docs` on Fumadocs reading repo-root `docs/` as content (check Fumadocs + Turborepo docs via Context7
   first). Done when `pnpm --filter docs dev` serves every page and `pnpm --filter docs build` passes in CI.
 
 ## Questions for Emil
