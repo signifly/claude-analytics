@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { after, test } from "node:test";
-import { acquire, isHeld, spawnAllowed } from "../plugins/usage-analytics/scripts/flusher-lock.mjs";
+import { acquire, isHeld, mayStartFlusher, spawnAllowed } from "../plugins/usage-analytics/scripts/flusher-lock.mjs";
 
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "flusher-lock-"));
 const pidFile = (dir) => path.join(dir, "flusher.pid");
@@ -143,4 +143,14 @@ test("if the throttle marker cannot be written, starting a flusher is still allo
   const blocked = path.join(tmpDir(), "a-file");
   fs.writeFileSync(blocked, "");
   assert.equal(spawnAllowed(path.join(blocked, "analytics")), true);
+});
+
+test("a hook may start a flusher only when none holds the lock, and then at most once per interval", () => {
+  const dir = tmpDir();
+  const lock = acquire(dir);
+  assert.equal(mayStartFlusher(dir), false);
+  assert.equal(fs.existsSync(path.join(dir, ".flusher-spawned")), false); // a held lock does not use up the throttle
+  lock.release();
+  assert.equal(mayStartFlusher(dir), true);
+  assert.equal(mayStartFlusher(dir), false);
 });

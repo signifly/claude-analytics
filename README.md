@@ -126,7 +126,7 @@ All under `plugins/usage-analytics/scripts/`. Terms are defined in [CONTEXT.md](
 |---|---|
 | `usage-event.mjs` | `toEvent(payload, context)` (`context` may be a function, looked up lazily): kinds, names, the allow-list that keeps content out, and the `LABELS` list |
 | `event-buffer.mjs` | `openBuffer(dir)` → `append` / `pending` / `claim` / `batch.settle`: the live file, batches, dead/, caps, expiry, late writes |
-| `flusher-lock.mjs` | `isHeld` / `acquire` → `stillMine` / `release`, `spawnAllowed`: one flusher per data dir, pid file with heartbeat |
+| `flusher-lock.mjs` | `mayStartFlusher` (for the hook), `acquire` → `stillMine` / `release` (for the flusher): one flusher per data dir, pid file with heartbeat |
 | `flush-once.mjs` | `flushOnce(buffer, sink)`: one pass — chunking, resume, rejection handling |
 | `drain.mjs` | the flusher loop: interval, backoff, idle exit, heartbeat before every push |
 | `loki-sink.mjs` | the Loki adapter for the sink: stream grouping, timestamps, auth, which status codes retry |

@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.mjs";
 import { openBuffer } from "./event-buffer.mjs";
-import { isHeld, spawnAllowed } from "./flusher-lock.mjs";
+import { mayStartFlusher } from "./flusher-lock.mjs";
 import { createLog, describe } from "./log.mjs";
 import { sessionContext } from "./session-context.mjs";
 import { toEvent } from "./usage-event.mjs";
@@ -41,7 +41,7 @@ function main() {
     if (!event) return;
 
     if (!openBuffer(dir, { log }).append(event)) logOnce("buffer-full", "live file is over its size cap, refusing new events until the flusher claims it");
-    if (!isHeld(dir) && spawnAllowed(dir)) startFlusher(stderrTarget(), log);
+    if (mayStartFlusher(dir)) startFlusher(stderrTarget(), log);
   } catch (err) {
     // Analytics must never surface errors into a session; leave a trace instead
     // (throttled: a broken data dir would otherwise log on every hook event).
