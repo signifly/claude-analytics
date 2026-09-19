@@ -48,6 +48,16 @@ All phase 1–4 items above are done. A fresh audit found one item worth a PR an
   read-only data dir, the file does not grow and later lines land in the capped fallback (test skipped as root,
   failing before the fix).
 
+## Audit 5 (2026-09-19, main at b5053ac)
+
+- [x] **The flusher spawn throttle holds when the data dir is unwritable.** `spawnAllowed` keeps its only marker in
+  the data dir and allows the spawn when it cannot write it, so with a read-only data dir (and a still-writable live
+  file) every hook event spawns a flusher that dies in `acquire` and logs an unthrottled `lock error` (reproduced: 6
+  events, 6 flushers, 6 lines), against ADR 0004 ("respawned at most every 5 seconds") and `docs/how-it-works.mdx`.
+  Give it the temp-dir fallback marker `logOnce` already has. _Done when:_ `spawnAllowed` on an unwritable data dir
+  returns true once and then false within the interval, and a hook test against a read-only data dir finds exactly
+  one `lock error` line (both skipped as root, failing before the fix); the loaded run passes.
+
 ## Phase 1: code quality
 
 - [x] **Session cache retention belongs to session-context.** `flush.mjs` defines `SESSION_CACHE_MS` and passes it

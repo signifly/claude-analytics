@@ -142,7 +142,7 @@ test("starting a flusher is allowed at most once per interval, so one that dies 
 test("if the throttle marker cannot be written, starting a flusher is still allowed", () => {
   const blocked = path.join(tmpDir(), "a-file");
   fs.writeFileSync(blocked, "");
-  assert.equal(spawnAllowed(path.join(blocked, "analytics")), true);
+  assert.equal(spawnAllowed(path.join(blocked, "analytics"), { fallbackDir: path.join(blocked, "tmp") }), true); // neither marker writable
 });
 
 test("a hook may start a flusher only when none holds the lock, and then at most once per interval", () => {
@@ -153,4 +153,13 @@ test("a hook may start a flusher only when none holds the lock, and then at most
   lock.release();
   assert.equal(mayStartFlusher(dir), true);
   assert.equal(mayStartFlusher(dir), false);
+});
+
+test("with an unwritable data dir the spawn throttle still holds, through a marker in the fallback dir", () => {
+  const blocked = path.join(tmpDir(), "a-file");
+  fs.writeFileSync(blocked, "");
+  const dir = path.join(blocked, "analytics"); // cannot be created: its parent is a file
+  const fallbackDir = tmpDir();
+  assert.equal(spawnAllowed(dir, { fallbackDir }), true);
+  assert.equal(spawnAllowed(dir, { fallbackDir }), false);
 });

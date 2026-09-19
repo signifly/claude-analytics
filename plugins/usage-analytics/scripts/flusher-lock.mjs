@@ -1,6 +1,8 @@
 // Flusher lock: guarantees one flusher per data dir. A pid file with a
 // heartbeat; the single place that knows what "a flusher is alive" means.
+import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe } from "./log.mjs";
 
@@ -147,15 +149,27 @@ export function mayStartFlusher(dir) {
 
 // Throttle for whoever starts flushers: true at most once per interval. A
 // flusher that dies at startup (bad install, broken lock) would otherwise be
-// respawned on every hook event. Errs towards allowing.
-export function spawnAllowed(dir, { minIntervalMs = 5000 } = {}) {
-  const marker = path.join(dir, ".flusher-spawned");
-  try {
-    if (Date.now() - fs.statSync(marker).mtimeMs < minIntervalMs) return false;
-  } catch {}
+// respawned on every hook event. Errs towards allowing. The marker falls back
+// to the temp dir, like log.mjs's throttle, or an unwritable data dir would turn
+// the throttle off exactly when it is needed.
+export function spawnAllowed(dir, { minIntervalMs = 5000, fallbackDir = os.tmpdir() } = {}) {
+  const markers = [
+    path.join(dir, ".flusher-spawned"),
+    path.join(fallbackDir, `claude-analytics.flusher-spawned-${crypto.createHash("sha1").update(dir).digest("hex").slice(0, 8)}`),
+  ];
+  for (const marker of markers) {
+    try {
+      if (Date.now() - fs.statSync(marker).mtimeMs < minIntervalMs) return false;
+    } catch {}
+  }
   try {
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(marker, "");
   } catch {}
+  for (const marker of markers) {
+    try {
+      fs.writeFileSync(marker, "");
+      break;
+    } catch {}
+  }
   return true;
 }
