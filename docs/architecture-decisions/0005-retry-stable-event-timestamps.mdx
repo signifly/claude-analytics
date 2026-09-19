@@ -46,7 +46,7 @@ two identical events in the same millisecond almost always get different timesta
 
 - A re-pushed event is byte-for-byte the entry Loki already has, so wherever Loki drops duplicates, retries,
   resumed batches, held rests and late-write batches do not inflate counts. This is the property ADR 0002's "the
-  worst case is a batch pushed twice" relies on; see the first negative consequence for where that holds.
+  worst case is a batch pushed twice" relies on; see the second negative consequence for where that holds.
 - No coordination between writers: each hook process draws its own digits.
 - The log line stays exactly the allow-listed fields; no event id is needed to keep entries distinct.
 
