@@ -86,3 +86,23 @@ test("a log that cannot be rotated stops growing and later lines go to the cappe
   assert.match(fs.readFileSync(fallback, "utf8"), /line 49/);
   assert.ok(fs.statSync(fallback).size < 600, `fallback grew to ${fs.statSync(fallback).size} bytes`);
 });
+
+test("when neither log can be rotated, logging drops the line instead of throwing or growing either file", { skip: process.getuid?.() === 0 && "root ignores permissions" }, () => {
+  const dir = tmpDir();
+  const fallbackDir = tmpDir();
+  const { file, log } = createLog(dir, { fallbackDir, maxBytes: 300 });
+  log("x".repeat(400));
+  fs.chmodSync(dir, 0o555);
+  const fallback = path.join(fallbackDir, "claude-analytics.log");
+  fs.writeFileSync(fallback, "y".repeat(400));
+  fs.chmodSync(fallbackDir, 0o555);
+  const sizes = () => [fs.statSync(file).size, fs.statSync(fallback).size];
+  const before = sizes();
+  try {
+    for (let i = 0; i < 20; i++) assert.doesNotThrow(() => log(`line ${i}`));
+    assert.deepEqual(sizes(), before);
+  } finally {
+    fs.chmodSync(dir, 0o755);
+    fs.chmodSync(fallbackDir, 0o755);
+  }
+});

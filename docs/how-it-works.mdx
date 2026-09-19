@@ -23,8 +23,8 @@ Each hook runs `scripts/record.mjs`, which:
 
 Whatever happens, the hook exits 0 and prints nothing, even if the plugin is half-updated and its modules fail to
 load. Problems go to the log instead (see [Troubleshooting](#troubleshooting)). Only two cases are silent: a
-failure to load the plugin's own modules, and having nowhere writable to log. The live file refuses new events while
-it is over 50 MB.
+failure to load the plugin's own modules, and having nowhere to log (neither the log nor its fallback can be
+written, or both are full and cannot be rotated). The live file refuses new events while it is over 50 MB.
 
 The identity tag and project are resolved once per session and cached under `<data dir>/sessions/`, so later
 events skip the git lookups. If git itself fails (missing, timing out), the fallback answer is cached for only

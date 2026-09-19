@@ -33,8 +33,14 @@ export function createLog(dir, { fallbackDir = os.tmpdir(), maxBytes = MAX_LOG_B
     let size = 0;
     try {
       size = fs.statSync(target).size;
-    } catch {} // not there yet: nothing to rotate
-    if (size > maxBytes) fs.renameSync(target, `${target}.1`);
+    } catch {} // missing or unreadable: let the append decide
+    if (size > maxBytes) {
+      try {
+        fs.renameSync(target, `${target}.1`);
+      } catch (err) {
+        if (err?.code !== "ENOENT") throw err; // ENOENT: another process rotated it first
+      }
+    }
     fs.appendFileSync(target, line);
   }
 
