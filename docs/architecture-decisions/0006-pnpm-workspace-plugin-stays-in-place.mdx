@@ -16,7 +16,8 @@ Accepted
 
 The repo holds one Claude Code plugin, a docker compose stack, tests and docs. A docs site built from `docs/` is
 next, and it brings its own dependencies and build. Those must not leak into the plugin: installing it has to stay
-"copy some `.mjs` files", with nothing to install and nothing to build (see [0001](0001-hooks-and-local-buffer-over-native-telemetry.mdx)).
+"copy some `.mjs` files", with nothing to install and nothing to build (see
+[0002](0002-append-only-file-buffer.mdx) and [0004](0004-flusher-spawned-on-demand.mdx)).
 
 Forces:
 
@@ -30,7 +31,7 @@ Forces:
 
 Make the repo a pnpm workspace. `pnpm-workspace.yaml` lists `plugins/*`, so the plugin is a workspace package
 without moving. It gets a `package.json` with no dependencies and only a `check` script. The root `package.json`
-pins the package manager (`pnpm@10.34.5`, which supports Node 18) and keeps the tests, which exercise the plugin
+pins the package manager (`pnpm@10.34.5`, which supports Node 18.12 and newer) and keeps the tests, which exercise the plugin
 from the outside.
 
 Turborepo follows in separate steps: a `turbo.json` with `test`, `check` and `build` tasks, then CI running through
@@ -44,7 +45,7 @@ runtime.
 ### Positive Consequences
 
 - A docs app, or any later tool, can join the repo with its own dependencies without touching the plugin.
-- Existing installs and the marketplace keep working: the plugin's path, manifest and files are unchanged.
+- Existing installs and the marketplace keep working: the plugin's path, manifest and runtime code are unchanged.
 - One command set for local work and CI, once CI runs through turbo.
 
 ### Negative Consequences
@@ -52,7 +53,9 @@ runtime.
 - Contributors need pnpm (via corepack or an install) for workspace commands; npm alone covers only the root scripts.
 - The plugin directory now contains a `package.json` that Claude Code does not use. It must stay free of
   dependencies, or an installed plugin would reference modules that were never installed.
-- pnpm is held at 10.x while Node 18 is supported: newer major versions raise their minimum Node version.
+- pnpm is pinned to 10.x. pnpm 11 requires Node 22.13 or newer and would not run in the Node 18 CI job. pnpm 12
+  declares Node 18 support again and ships as a standalone binary, but has not been tried here; moving to it is a
+  separate, deliberate step.
 
 ## Alternatives Considered
 
