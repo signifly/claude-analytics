@@ -42,11 +42,16 @@ test("any thrown value becomes one readable line", () => {
 
 test("a child process's stderr goes to the log, or to the fallback log when the data dir is unwritable", () => {
   const dir = tmpDir();
-  const { file, stderrTarget } = createLog(dir);
+  const unusedFallback = tmpDir();
+  const { file, log, stderrTarget } = createLog(dir, { fallbackDir: unusedFallback });
+  log("flusher started");
   const fd = stderrTarget();
   fs.writeSync(fd, "child crashed\n");
   fs.closeSync(fd);
-  assert.match(fs.readFileSync(file, "utf8"), /child crashed/);
+  const written = fs.readFileSync(file, "utf8");
+  assert.match(written, /flusher started/); // appended, not truncated
+  assert.match(written, /child crashed/);
+  assert.deepEqual(fs.readdirSync(unusedFallback), []);
 
   const blocked = path.join(tmpDir(), "a-file");
   fs.writeFileSync(blocked, "");
