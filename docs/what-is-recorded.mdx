@@ -32,8 +32,9 @@ reasoning is in [ADR 0003](architecture-decisions/0003-record-names-never-conten
 | `source` | The **source** |
 | `session_id` | Claude Code's session id; `unknown` if it is not a bare identifier, left out if the hook sent none |
 
-Every name is reduced to a bare identifier before it is stored (see **Name** in the glossary), so free text can
-never ride along. A skill invoked with a malformed name is recorded as `unknown`.
+`kind`, `name`, `mcp_server` and `subagent` are reduced to a bare identifier before they are stored (see **Name**
+in the glossary), so free text can never ride along in them; a skill invoked with a malformed name is recorded as
+`unknown`. `user`, `project` and `source` come from the session context and are only cut to 200 characters.
 
 ## Kinds of event
 
