@@ -106,6 +106,12 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   event") reads as if shorter stalls were safe. Touching the file in `retire()` would make the grace period start
   at the settle: a behaviour change to the buffer, so not taken by the quality loop. Found in review of #8.
 
+- **Are late re-pushes deduplicated?** ADR 0005 and ADR 0002 rely on Loki dropping a re-pushed event. Loki's
+  docs promise that only while the original is in the ingester's open chunk (and across replicas). A retry after the
+  chunk was flushed (outages, batches held for hours) may be counted twice. Worth checking against the stack: push an
+  event, force a flush (`POST /flush`), push it again, and count it with a query. If duplicates survive, options are
+  query-side dedup in the dashboard or accepting the overcount. Found in review of #18.
+
 ## Parked
 
 _None yet._

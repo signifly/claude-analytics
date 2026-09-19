@@ -17,8 +17,10 @@ Accepted
 [ADR 0002](0002-append-only-file-buffer.mdx) accepts that a batch can be pushed twice: every failure path in the
 event buffer prefers pushing again over losing events. That is only safe if Loki recognises the second copy.
 
-Loki's ingester ignores an entry whose nanosecond timestamp and line are both identical to one already in the stream,
-and the querier deduplicates such entries across replicas and chunks. Any other pair counts as a new entry.
+Loki's documentation says the ingester ignores an entry whose nanosecond timestamp and line are both identical to
+one already in the stream, and that the querier deduplicates what several replicas wrote. Any other pair counts as
+a new entry. The documentation does not say whether a duplicate that arrives after the original's chunk has been
+flushed to storage is also dropped, at write time or at query time.
 
 Forces:
 
@@ -51,6 +53,10 @@ two identical events in the same millisecond almost always get different timesta
 
 - Two identical events in the same millisecond still collapse, with a probability of one in a million per pair.
   For usage counting this is negligible.
+- A re-push is documented to be dropped only while the original is still in the ingester's open chunk. A retry that
+  arrives later (after a long outage, or from a batch held for hours) may be counted twice. This is unverified in
+  either direction for this stack (a single ingester, replication factor 1), and is recorded as an open question in
+  `docs/quality-backlog.md`.
 - Correctness depends on Loki's duplicate handling. Enabling `increment_duplicate_timestamp` in `stack/loki.yaml`
   would turn a re-pushed event into a second entry; it is off by default and must stay off.
 - Events written by a version of the plugin before `sub` existed get the position within the push instead. Those
