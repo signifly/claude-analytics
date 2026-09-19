@@ -1,0 +1,87 @@
+---
+title: Install
+description: Add the usage-analytics plugin for one developer, a whole team repo, or an autonomous agent, and configure it with environment variables.
+---
+
+# Install
+
+The plugin needs `node` 18 or newer on the machine or container that runs Claude Code, on the `PATH` that hooks
+run with. It has no other dependencies. Events go to a Loki; to run one locally, see
+[Run the stack](https://github.com/signifly/claude-analytics#run-the-stack) in the README.
+
+## For yourself
+
+The repository is a plugin marketplace:
+
+```sh
+claude plugin marketplace add signifly/claude-analytics
+claude plugin install usage-analytics@claude-analytics
+```
+
+To try it without installing, start Claude Code with `claude --plugin-dir plugins/usage-analytics` from a clone.
+
+After the plugin changes, run `claude plugin marketplace update claude-analytics` and restart Claude Code.
+
+## For a team repo
+
+Copy [`examples/project-settings.json`](https://github.com/signifly/claude-analytics/blob/main/examples/project-settings.json)
+into the repo's `.claude/settings.json`. The plugin is enabled for everyone once they trust the folder:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "claude-analytics": {
+      "source": { "source": "github", "repo": "signifly/claude-analytics" }
+    }
+  },
+  "enabledPlugins": {
+    "usage-analytics@claude-analytics": true
+  },
+  "env": {
+    "CLAUDE_ANALYTICS_LOKI_URL": "http://localhost:3100"
+  }
+}
+```
+
+To make it mandatory across an organisation, put the same keys in managed settings.
+
+## For Sandcastle agents
+
+Pass identity through the `env` option, so it exists before Claude Code starts:
+
+```ts
+await sandcastle.run({
+  // ...
+  env: {
+    CLAUDE_ANALYTICS_USER: "agent:pr-reviewer",
+    CLAUDE_ANALYTICS_SOURCE: "sandcastle",
+    CLAUDE_ANALYTICS_LOKI_URL: "http://host.docker.internal:3100",
+  },
+});
+```
+
+- Each container runs its own event buffer and flusher. Don't mount the host's `~/.claude/analytics` into a
+  container: the flusher lock is pid-based, and pids don't carry across containers.
+- Set `CLAUDE_ANALYTICS_USER` explicitly. Containers often have no git identity or passwd entry to fall back on.
+- With the stack's default loopback binding, a container may not reach the host's Loki. Point it at a shared Loki,
+  or start the stack with `BIND_ADDRESS=0.0.0.0` (read
+  [Run the stack](https://github.com/signifly/claude-analytics#run-the-stack) first).
+
+## Configuration
+
+Everything is set through environment variables. Set shared values through the `env` key of a settings file, as
+in the team example above, or in the real environment.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CLAUDE_ANALYTICS_LOKI_URL` | `http://localhost:3100` | Loki base URL |
+| `CLAUDE_ANALYTICS_USER` | `git config user.email`, then OS user | Identity tag (`user` label) |
+| `CLAUDE_ANALYTICS_SOURCE` | `dev` | `dev` or e.g. `sandcastle` (`source` label) |
+| `CLAUDE_ANALYTICS_PROJECT` | repo name of the `origin` remote, then git root folder, then cwd folder | `project` label |
+| `CLAUDE_ANALYTICS_LOKI_TOKEN` / `_LOKI_BASIC_AUTH` / `_LOKI_TENANT` | – | Bearer token (wins over basic), `user:pass`, `X-Scope-OrgID` |
+| `CLAUDE_ANALYTICS_DIR` | `~/.claude/analytics` (temp dir if there is no home) | Data dir: where the event buffer lives |
+| `CLAUDE_ANALYTICS_FLUSH_MS` / `_IDLE_EXIT_MS` | `1000` / `600000` | Flush interval, idle time before the flusher exits (values under 100 or non-numeric are ignored, with a log line) |
+| `CLAUDE_ANALYTICS_DISABLED` | – | `1`, `true` or `yes` turns recording off (anything else is logged and ignored) |
+
+The identity tag defaults to the git email, which is personal data. Teams that object should set
+`CLAUDE_ANALYTICS_USER` to a handle.
