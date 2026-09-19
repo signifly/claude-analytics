@@ -95,6 +95,14 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   `isHeld` return true and `acquire` return null on a non-ENOENT stat failure: a lock-semantics change, not a
   refactor, and it needs a stat seam that does not exist yet. Moved out of phase 1 for that reason.
 
+- **Should the grace period count from the settle?** `sweepSettled` in `event-buffer.mjs` removes a settled
+  batch once its file has gone `settleGraceMs` without a write, measured from the file's mtime. Settling does not
+  touch the mtime, so a batch whose last write was more than 5 s before its settle is removed on the next claim,
+  milliseconds after the settle. A writer that opened the live file just before the claim and stalls briefly can
+  then lose its event. ADR 0002 line 55 ("A writer stalled for longer than the grace period can still lose its
+  event") reads as if shorter stalls were safe. Touching the file in `retire()` would make the grace period start
+  at the settle: a behaviour change to the buffer, so not taken by the quality loop. Found in review of #8.
+
 ## Parked
 
 _None yet._

@@ -28,7 +28,7 @@ Domain language for claude-analytics. Use these terms exactly in code, tests, do
 
 **Batch** — a claimed slice of the buffer (`batch-*.jsonl`): renamed away from the live file so writers and the flusher don't contend. The one overlap — a slow writer appending to a file that was already claimed, or even settled — is caught: see **Late write**.
 
-**Grace period** — how long a settled batch must go without a late write before it is removed; every late write restarts it. A writer stalled for longer than that can lose its event.
+**Grace period** — how long a settled batch must go without any write before it is removed; every late write restarts it. It counts from the batch's last write, not from its settle, so a batch that was quiet before it was settled can be removed at once, and a slow writer that only now gets to write can lose its event.
 
 **Late write** — an event a slow writer puts into a batch file after the claim. Before the settle it is a *late tail* and stays held; after it, the settled file is still being watched and the bytes become a batch of their own.
 
@@ -36,7 +36,7 @@ Domain language for claude-analytics. Use these terms exactly in code, tests, do
 
 **Held** — events still on disk waiting for a later attempt.
 
-**Backlog** — the events on disk and not yet delivered: the live file and the held batches. The two parts are capped separately, at the same size: over its cap the live file refuses new events (logged), and the oldest held batches are evicted, each with a log line.
+**Backlog** — the events waiting for delivery: the live file and the held batches. The two parts are capped separately, at the same size: over its cap the live file refuses new events (logged), and the oldest held batches are evicted, each with a log line.
 
 **Dead** — events set aside in `dead/` for inspection: rejected by the sink, or in a batch that could not be read. _Avoid_: dropped. Events only ever leave the buffer undelivered with a log line: expiry, unparseable lines, cap eviction, a full live file, or an unusable `dead/`.
 
