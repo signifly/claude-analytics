@@ -26,7 +26,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   fallback path (or a `stderrTarget()` that opens the first writable of the two) and use it in `startFlusher`.
   _Done when:_ among `plugins/usage-analytics/scripts/`, the string `claude-analytics.log` appears only in
   `log.mjs`, and `test/log.test.mjs` covers the new interface.
-- [ ] **One question for "should this hook start a flusher?".** `record-main.mjs` must know to call
+- [x] **One question for "should this hook start a flusher?".** `record-main.mjs` must know to call
   `isHeld(dir)` before `spawnAllowed(dir)` (the other order touches the throttle marker for nothing). Add
   `mayStartFlusher(dir)` to `flusher-lock.mjs` that owns the order; keep `isHeld`/`spawnAllowed` exported for
   their existing tests. _Done when:_ `record-main.mjs` makes one lock call and a test pins that a held lock does

@@ -139,6 +139,12 @@ function handle(file, log) {
   };
 }
 
+// The hook's one question: start a flusher now? Checks the lock first, so a
+// running flusher doesn't use up the spawn throttle.
+export function mayStartFlusher(dir) {
+  return !isHeld(dir) && spawnAllowed(dir);
+}
+
 // Throttle for whoever starts flushers: true at most once per interval. A
 // flusher that dies at startup (bad install, broken lock) would otherwise be
 // respawned on every hook event. Errs towards allowing.
