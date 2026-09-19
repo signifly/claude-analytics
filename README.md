@@ -15,6 +15,7 @@ Claude Code hooks ──append──▶ ~/.claude/analytics/events.jsonl ──f
 ## Quick start
 
 ```sh
+git clone https://github.com/signifly/claude-analytics && cd claude-analytics
 docker compose up -d                                        # the stack; Grafana on http://localhost:3030
 claude plugin marketplace add signifly/claude-analytics
 claude plugin install usage-analytics@claude-analytics      # needs node >= 18 on the PATH hooks run with

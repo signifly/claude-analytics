@@ -1,7 +1,8 @@
 name: claude-analytics
 
 # Ports are published on loopback only. Set BIND_ADDRESS=0.0.0.0 to expose them, and
-# then also set GRAFANA_ANONYMOUS=false, a real admin password, and put Loki behind auth.
+# then also set GRAFANA_ANONYMOUS=false, a real admin password, put Loki behind auth, and
+# keep the unauthenticated OTLP ports private. See docs/operating-the-stack.mdx.
 
 services:
   loki:

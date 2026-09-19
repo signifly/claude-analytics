@@ -1,0 +1,78 @@
+---
+title: ✅ Flusher spawned on demand by the hook
+description: The hook starts a flusher when none holds the data dir, and the flusher exits once idle, instead of a long-lived daemon, a flusher per session, or flushing from the hook itself.
+---
+
+# 0004. Flusher spawned on demand by the hook
+
+Date: 2026-09-19
+Author: Emil Hørlyck
+
+## Status
+
+Accepted
+
+## Context
+
+Hooks only append to the event buffer ([0002](0002-append-only-file-buffer.mdx)); something else has to move the
+events to Loki. That process has to exist on every developer machine and in every agent container, including
+Sandcastle containers that live for a single run. The plugin marketplace installs files, not services, and the plugin
+has no dependencies.
+
+Forces:
+
+- Installing the plugin must be the whole installation: no service manager, no second step per machine.
+- One sender per data dir, so batches are not pushed twice by competing processes.
+- A sender that crashes, hangs, or dies at startup must not leave events stranded or respawn in a tight loop.
+- Nothing may run for long on a machine that is not using Claude Code.
+
+## Decision
+
+The hook starts the flusher. After appending an event, `record-main.mjs` asks the flusher lock whether it may start
+one (`mayStartFlusher`): only when no live flusher holds the data dir, and at most once every 5 seconds. It then
+spawns `flush.mjs` detached and unreferenced, with its stderr going to the log, and exits without waiting.
+
+The flusher takes the lock and drains the buffer until it has been idle for 10 minutes by default
+(`CLAUDE_ANALYTICS_IDLE_EXIT_MS`): no new events arrived and none left the buffer. Held batches during an outage
+do not count as activity. After releasing the lock it checks the buffer once more, because an event appended while
+it was shutting down saw a live flusher and started nothing; if there is one, it takes the lock again.
+
+## Consequences
+
+### Positive Consequences
+
+- No install step beyond the plugin, and the same mechanism works on a laptop and in a container.
+- Nothing runs when Claude Code is not in use.
+- A crashed or hung flusher is replaced by the next hook event; the lock's heartbeat covers a hung one.
+- A flusher that dies at startup (a broken install, an unusable data dir) is respawned at most every 5 seconds, not
+  on every hook event.
+- An outage does not keep a process alive for hours: the flusher gives up after the idle time, and the next hook event
+  starts a fresh one that retries the held batches.
+
+### Negative Consequences
+
+- Events wait in the buffer while no Claude Code session runs; nothing flushes them until the next hook event. A
+  machine that stops using Claude Code keeps its last events until it starts again, or until they expire.
+- The flusher inherits the Loki settings of the session that started it. Sessions on one data dir with different
+  `CLAUDE_ANALYTICS_LOKI_*` settings share whichever flusher is running.
+- Each hook event pays for a lock check, and occasionally a process spawn.
+- Correctness depends on the pid-based lock, which is why a data dir must not be shared across containers
+  ([0002](0002-append-only-file-buffer.mdx)).
+
+## Alternatives Considered
+
+### Long-lived daemon under launchd or systemd
+
+**Rejected because**: it needs a per-machine install step that the plugin marketplace cannot perform, differs per
+operating system, and has no natural home in a short-lived agent container.
+
+### One flusher per Claude Code session
+
+**Rejected because**: several sessions share one data dir, so their flushers would compete for the same batches;
+the lock would reduce them to one anyway, and a flusher tied to a session stops when the session does, even with
+events still held.
+
+### Flushing from the hook itself
+
+**Rejected because**: it puts network I/O back into the hook, which [0001](0001-hooks-and-local-buffer-over-native-telemetry.mdx)
+rules out. An async hook still runs a process per event, and every network problem would become a hook problem.

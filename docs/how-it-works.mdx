@@ -22,8 +22,9 @@ Each hook runs `scripts/record.mjs`, which:
 3. starts a flusher if none is running, at most once every 5 seconds.
 
 Whatever happens, the hook exits 0 and prints nothing, even if the plugin is half-updated and its modules fail to
-load. Problems go to the log instead (see [Troubleshooting](#troubleshooting)). Only two cases are silent: a failure
-to load the plugin's own modules, and having nowhere writable to log. The live file refuses new events while it is over 50 MB.
+load. Problems go to the log instead (see [Troubleshooting](#troubleshooting)). Only two cases are silent: a
+failure to load the plugin's own modules, and having nowhere writable to log. The live file refuses new events while
+it is over 50 MB.
 
 The identity tag and project are resolved once per session and cached under `<data dir>/sessions/`, so later
 events skip the git lookups. If git itself fails (missing, timing out), the fallback answer is cached for only
@@ -43,7 +44,9 @@ file; writers reopen the path for every event, so new events land in a fresh liv
 held batch to Loki's `/loki/api/v1/push`, oldest first, in chunks of about 1 MiB, and **settles** each one.
 
 It exits after 10 minutes (by default) in which no new events arrived and no events left the buffer. Held
-batches during an outage do not keep it alive; the next hook event starts a new flusher that retries them.
+batches during an outage do not keep it alive; the next hook event starts a new flusher that retries them. Why
+the flusher is started this way, rather than run as a daemon, is in
+[ADR 0004](architecture-decisions/0004-flusher-spawned-on-demand.mdx).
 
 ## When delivery fails
 
@@ -81,7 +84,7 @@ All under `plugins/usage-analytics/scripts/`.
 
 | Module | Owns |
 |---|---|
-| `usage-event.mjs` | `toEvent(payload, context)`: kinds, names, the allow-list that keeps content out, and the Loki label list |
+| `usage-event.mjs` | `toEvent(payload, context)` (`context` may be a function, looked up only for payloads that produce an event): kinds, names, the allow-list that keeps content out, and the Loki label list |
 | `event-buffer.mjs` | `openBuffer(dir)` → `append` / `pending` / `claim` / `batch.settle`: the live file, batches, `dead/`, caps, expiry, late writes, and the file names they use |
 | `flusher-lock.mjs` | `mayStartFlusher` for the hook; `acquire` → `stillMine` / `release` for the flusher: one flusher per data dir |
 | `flush-once.mjs` | `flushOnce(buffer, sink)`: one pass, covering chunking, resume and rejection handling |
@@ -99,8 +102,8 @@ sink, and the Loki adapter against an injected `fetch`.
 ## Troubleshooting
 
 - `~/.claude/analytics/flusher.log` records flusher start and exit, lost or taken-over locks, config warnings,
-  failed and recovered pushes with their cause, rejected events, evictions, skipped lines, a full live file, and
-  the flusher's stderr if it crashes. It rotates to `.log.1` at 1 MB. If the data dir is not writable, it falls
+  failed and recovered pushes with their cause, batches delivered but not settled, rejected events, evictions,
+  skipped lines, a full live file, `dead/` or session-cache problems, and the flusher's stderr if it crashes. It rotates to `.log.1` at 1 MB. If the data dir is not writable, it falls
   back to `$TMPDIR/claude-analytics.log`, with the same cap. Most hook-side messages are limited to one per kind
   per hour.
 - Leftover `batch-*.jsonl` files mean Loki was unreachable or misconfigured. The next flusher retries them.

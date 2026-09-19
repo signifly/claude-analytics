@@ -68,7 +68,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   `docs/install.mdx` link to it instead of the README's "Run the stack" section.
 - [x] Shrink `README.md` to an entry point that links into `docs/`; keep `CONTEXT.md` as the glossary.
   _Done when:_ README is at most 60 lines and every section it dropped lives in a docs page.
-- [ ] ADR (via /architect:adr): the flusher is spawned on demand by hooks and exits when idle, rather than a
+- [x] ADR (via /architect:adr): the flusher is spawned on demand by hooks and exits when idle, rather than a
   daemon (launchd/systemd) or a flusher per session. _Done when:_ the ADR is in `docs/architecture-decisions/`.
 - [ ] ADR (via /architect:adr): why events carry `sub` (retry-stable nanosecond timestamps). ADR 0002 already
   relies on Loki deduplicating re-pushes; this one records the timestamp scheme that makes that true and
