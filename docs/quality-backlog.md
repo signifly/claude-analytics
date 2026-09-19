@@ -25,6 +25,14 @@ All phase 1–4 items above are done. A fresh audit found one item worth a PR an
   Route the buffer's log through `logOnce`. _Done when:_ a test in `test/record.test.mjs` (skipped as root) runs the
   hook several times against an unreadable data dir and finds exactly one `cannot stat` line, and fails before the fix.
 
+## Audit 3 (2026-09-19, main at 325e99f)
+
+- [x] **Hook tests stay out of the machine's temp dir.** `runHook` in `test/record.test.mjs` built the hook's
+  environment without `TMPDIR`, so the no-HOME case wrote a test event into `/tmp/claude-analytics` (the real
+  fallback buffer for sessions without a home) and started a flusher on it, and the blocked-dir case added log
+  throttle markers to `/tmp` on every run. _Done when:_ every hook test runs with its own `TMPDIR`, the no-HOME and
+  blocked-dir cases assert their buffer and log land there, and a run adds nothing to `/tmp/claude-analytics*`.
+
 ## Phase 1: code quality
 
 - [x] **Session cache retention belongs to session-context.** `flush.mjs` defines `SESSION_CACHE_MS` and passes it
