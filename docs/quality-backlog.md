@@ -46,7 +46,8 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   existing tests in `test/event-buffer.test.mjs` pass without modification; a new table test pins that each
   helper-produced name is byte-identical to the pre-refactor format and that pre-refactor names parse; and the
   loaded run passes.
-  *(after #3, which changes held naming)*
+  *(after #3, which changes held naming)* Done in #10. The helper is module-private, so the format is pinned through
+  `openBuffer` rather than by a table test of the helper itself.
 - [ ] **One vanished session file does not end the whole prune.** In `pruneSessions` a single `statSync` that
   hits ENOENT (a hook's `.tmp` renamed away between `readdirSync` and `statSync`) throws out of the loop, is
   swallowed as "no cache", and skips every remaining file until the next flusher start. Handle each file on its

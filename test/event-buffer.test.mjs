@@ -435,8 +435,9 @@ test("buffer files keep their on-disk names: claimed, held, settled and late", (
 
   batch.settle({ handled: 1 }); // the held rest, partly settled again: still one "-held-" segment
   const heldBytes = claimedBytes - Buffer.byteLength(JSON.stringify(event("a")) + "\n");
+  const heldSettled = `batch-${NOW}-${pid}-000000-held-${pid}-0.jsonl.settled-${heldBytes}-${pid}-1`;
   assert.deepEqual(listing(), [
-    `batch-${NOW}-${pid}-000000-held-${pid}-0.jsonl.settled-${heldBytes}-${pid}-1`,
+    heldSettled,
     `batch-${NOW}-${pid}-000000-held-${pid}-1.jsonl`,
     `batch-${NOW}-${pid}-000000-late-${pid}-0-${String(claimedBytes).padStart(12, "0")}.jsonl`,
     `batch-${NOW}-${pid}-000000.jsonl.settled-${claimedBytes + lateBytes}-${pid}-0`,

@@ -21,14 +21,13 @@ const DEFAULTS = {
 // older one left) and they carry ADR 0002's ordering: a batch is named for its
 // claim time, and its -held- and -late- pieces sort right after it, so name
 // order is age order.
-const SETTLED = /^(batch-.*\.jsonl)\.settled-(\d+)-(.+)$/;
 const stem = (batchName) => batchName.replace(/\.jsonl$/, "");
 // Written by a settle, cleaned up by the sweep: one suffix, so the two cannot drift apart.
 const TMP_SUFFIX = ".tmp";
 const names = {
   live: "events.jsonl",
   batch: /^batch-.*\.jsonl$/,
-  settled: SETTLED,
+  settled: /^(batch-.*\.jsonl)\.settled-(\d+)-(.+)$/,
   tmp: new RegExp(`^batch-.*\\.jsonl${TMP_SUFFIX.replace(".", "\\.")}$`),
   // Claim time, then pid and a counter to keep it unique.
   claimed: (time, pid, seq) => `batch-${time}-${pid}-${String(seq).padStart(6, "0")}.jsonl`,
@@ -37,11 +36,11 @@ const names = {
   held: (batchName, id) => `${stem(batchName).replace(/-held-\d+-\d+$/, "")}-held-${id}.jsonl`,
   // "-late" sorts after the parent's "-held" rest and before any newer batch;
   // the offset is padded so that name order is write order.
-  late: (batchName, id, seen) => `${stem(batchName)}-late-${id}-${seen.padStart(12, "0")}.jsonl`,
+  late: (batchName, id, seen) => `${stem(batchName)}-late-${id}-${String(seen).padStart(12, "0")}.jsonl`,
   settledAs: (batchName, bytesSeen, id) => `${batchName}.settled-${bytesSeen}-${id}`,
   // `seen` stays the string it was written as.
   parseSettled(name) {
-    const match = name.match(SETTLED);
+    const match = name.match(names.settled);
     return match && { batchName: match[1], seen: match[2], id: match[3] };
   },
   // The batch a held or late piece came from, without extension.
