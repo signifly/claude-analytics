@@ -6,7 +6,12 @@ current phase. One item = one PR, branched as `quality/<slug>`.
 Audit 1: 2026-09-19, against main at 9584787. Main green: 143 pass, 1 skipped (smoke, needs Loki).
 
 **Coordination:** Emil's PR #3 (`fix-held-name-nesting`) touches `event-buffer.mjs` and its tests.
-Items marked *(after #3)* wait until it has merged; skip past them to the next item until then.
+Items marked *(after #3)* wait until it has merged; skip past them to the next item until then. A waiting item
+does not block the next phase, but the "how it works" docs page is gated on #3 too, since it describes held naming.
+
+**Loaded run** (required for changes to event-buffer, drain, flush or flusher-lock):
+`for i in 1 2 3 4; do (while :; do :; done) & done; for i in $(seq 10); do node --test test/multi-process.test.mjs || break; done; kill %1 %2 %3 %4`
+passes all ten runs.
 
 ## Phase 1: code quality
 
@@ -37,7 +42,8 @@ Items marked *(after #3)* wait until it has merged; skip past them to the next i
   names with ad-hoc template strings and regexes spread over `claim`, `retire`, `sweepSettled` and `settle`
   (the `origin` regex). Collect them into one small internal naming helper so the age-order invariant in ADR 0002
   is visible in one place. No interface change. _Done when:_ the batch, `-held-`, `-late-`, `.settled-` and batch
-  `.tmp` names in the data dir (not `dead/`, not the live file) are produced and parsed by the helper, and `test/event-buffer.test.mjs` plus ten loaded runs of `test/multi-process.test.mjs` pass unchanged.
+  `.tmp` names in the data dir (not `dead/`, not the live file) are produced and parsed by the helper, and `test/event-buffer.test.mjs` pass unchanged, a new table test pins that each helper-produced name is byte-identical to the
+  pre-refactor format and that pre-refactor names parse, and the loaded run passes.
   *(after #3, which changes held naming)*
 
 ## Phase 2: documentation content
@@ -47,25 +53,27 @@ Items marked *(after #3)* wait until it has merged; skip past them to the next i
 - [ ] Docs page "what is recorded" (event shape, kinds, labels, the names-only rule). _Done when:_ the page exists,
   links ADR 0003 and `CONTEXT.md`, and repeats no glossary definitions.
 - [ ] Docs page "how it works" (hooks, buffer, flusher, failures, late writes, modules). _Done when:_ the page
-  exists and every module in the README Modules table is covered.
+  exists and every module in the README Modules table is covered. *(after #3)*
 - [ ] Docs page "operating the stack" (ports, auth, retention, dashboard, troubleshooting, native telemetry).
   _Done when:_ the page exists and covers every README section on these topics.
 - [ ] Shrink `README.md` to an entry point that links into `docs/`; keep `CONTEXT.md` as the glossary.
-  _Done when:_ README is under ~60 lines and every section it dropped lives in a docs page.
+  _Done when:_ README is at most 60 lines and every section it dropped lives in a docs page.
 - [ ] ADR (via /architect:adr): the flusher is spawned on demand by hooks and exits when idle, rather than a
   daemon (launchd/systemd) or a flusher per session. _Done when:_ the ADR is in `docs/architecture-decisions/`.
 - [ ] ADR (via /architect:adr): why events carry `sub` (retry-stable nanosecond timestamps). ADR 0002 already
   relies on Loki deduplicating re-pushes; this one records the timestamp scheme that makes that true and
-  references 0002 rather than re-deciding it.
+  references 0002 rather than re-deciding it. _Done when:_ the ADR is in `docs/architecture-decisions/`, links
+  ADRs 0002 and 0003, and matches `loki-sink.mjs` (ms timestamp plus `sub` padded to 6 digits; the index fallback
+  for events without `sub` is not retry-stable).
 
 ## Phase 3: Turborepo
 
 - [ ] pnpm workspaces: root `pnpm-workspace.yaml` with `plugins/*`, plugin `package.json` (zero deps, no build),
   lockfile; `pnpm test` / `pnpm check` work; CI still on npm scripts. ADR for the move.
-  _Done when:_ `pnpm install && pnpm test && pnpm check` pass from a clean clone and the ADR is merged.
+  _Done when:_ `pnpm install && pnpm test && pnpm check` pass from a clean clone and the ADR is in `docs/architecture-decisions/`.
 - [ ] turbo: `turbo.json` with `test`, `check`, `build`; root scripts delegate to turbo.
   _Done when:_ `pnpm turbo run test check build` passes locally with the plugin's tasks included.
-- [ ] CI runs through turbo. _Done when:_ every CI job invokes turbo and is green on the PR.
+- [ ] CI runs through turbo. _Done when:_ every CI step that ran an npm script runs it through turbo, and CI is green on the PR.
 
 ## Phase 4: docs app
 
