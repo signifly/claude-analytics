@@ -11,8 +11,6 @@ import { createLog } from "./log.mjs";
 import { createLokiSink } from "./loki-sink.mjs";
 import { pruneSessions } from "./session-context.mjs";
 
-const SESSION_CACHE_MS = 6 * 24 * 60 * 60 * 1000;
-
 const config = loadConfig();
 const { log } = createLog(config.dataDir);
 
@@ -26,7 +24,7 @@ async function main() {
   while ((lock = acquire(dir, { log }))) {
     log(`flusher started -> ${config.loki.url}`);
     for (const warning of config.warnings.splice(0)) log(warning);
-    pruneSessions(dir, SESSION_CACHE_MS, log);
+    pruneSessions(dir, { log });
     const idle = await drain({ buffer, sink, lock, flushMs: config.flushMs, idleExitMs: config.idleExitMs, log });
     lock.release();
     if (!idle) return;
