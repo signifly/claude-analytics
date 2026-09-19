@@ -35,7 +35,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   `maxBacklogBytes` and the "backlog over N bytes" log line, and covering both the live file cap and held
   batches), *data dir*, *claim*, *grace period*, or *push*. Add them, glossary-only, no implementation detail.
   _Done when:_ `CONTEXT.md` has entries for backlog, data dir, claim, grace period and push.
-- [ ] **drain test imports its collaborators like every other test.** `test/drain.test.mjs`'s last-but-one test
+- [x] **drain test imports its collaborators like every other test.** `test/drain.test.mjs`'s last-but-one test
   dynamically imports `event-buffer`, `fs`, `os`, `path` inside the test body. Move them to top-level imports.
   _Done when:_ no `await import(` in `test/`, all tests green.
 - [ ] **Buffer file names are built in one place.** `event-buffer.mjs` spells batch, held, late, settled and tmp
@@ -97,8 +97,9 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
 
 - **Should the grace period count from the settle?** `sweepSettled` in `event-buffer.mjs` removes a settled
   batch once its file has gone `settleGraceMs` without a write, measured from the file's mtime. Settling does not
-  touch the mtime, so a batch whose last write is 5 s old by the next claim's sweep is removed there, one flush
-  interval (1 s by default, longer while backing off) after its settle instead of 5 s after it. A writer that opened the live file just before the claim and stalls briefly can
+  touch the mtime, so a batch whose last write is 5 s old by the next claim's sweep is removed there: about one
+  flush interval after its settle (the rest of the pass plus one sleep of 1 s by default, longer while backing
+  off) instead of 5 s after it. A writer that opened the live file just before the claim and stalls briefly can
   then lose its event. ADR 0002 line 55 ("A writer stalled for longer than the grace period can still lose its
   event") reads as if shorter stalls were safe. Touching the file in `retire()` would make the grace period start
   at the settle: a behaviour change to the buffer, so not taken by the quality loop. Found in review of #8.
