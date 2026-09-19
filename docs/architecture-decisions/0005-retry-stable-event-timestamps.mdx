@@ -1,0 +1,86 @@
+---
+title: ✅ Retry-stable event timestamps
+description: Each usage event carries random sub-millisecond digits, fixed when it is recorded, so a re-pushed event is a duplicate Loki drops while two identical events in the same millisecond stay two entries.
+---
+
+# 0005. Retry-stable event timestamps
+
+Date: 2026-09-19
+Author: Emil Hørlyck
+
+## Status
+
+Accepted
+
+## Context
+
+[ADR 0002](0002-append-only-file-buffer.mdx) accepts that a batch can be pushed twice: every failure path in the
+event buffer prefers pushing again over losing events. That is only safe if Loki recognises the second copy.
+
+Loki's documentation says the ingester ignores an entry whose nanosecond timestamp and line are both identical to
+one already in the stream, and that the querier deduplicates what several replicas wrote. Any other pair counts as
+a new entry. The documentation does not say whether a duplicate that arrives after the original's chunk has been
+flushed to storage is also dropped, at write time or at query time.
+
+Forces:
+
+- A re-pushed event must have exactly the timestamp and line of the first push, or it is counted twice.
+- Two events that really did happen must not collapse into one. The log line holds only names and the session
+  context ([ADR 0003](0003-record-names-never-content.mdx)), so two uses of the same tool in the same session within
+  one millisecond produce identical lines.
+- JavaScript's clock has millisecond resolution, and Loki timestamps are in nanoseconds.
+- Several hook processes write concurrently, with no shared counter and no lock ([ADR 0002](0002-append-only-file-buffer.mdx)).
+
+## Decision
+
+When a usage event is recorded, it gets `ts`, the time in milliseconds, and `sub`, a random integer below 1,000,000
+drawn once and stored with the event in the buffer. The Loki adapter builds the entry's nanosecond timestamp from
+`ts` followed by `sub` padded to six digits, and leaves both out of the log line.
+
+Because `sub` is stored, every push of the same event produces the same timestamp and line. Because it is random,
+two identical events in the same millisecond almost always get different timestamps and stay two entries.
+
+## Consequences
+
+### Positive Consequences
+
+- A re-pushed event is byte-for-byte the entry Loki already has, so wherever Loki drops duplicates, retries,
+  resumed batches, held rests and late-write batches do not inflate counts. This is the property ADR 0002's "the
+  worst case is a batch pushed twice" relies on; see the second negative consequence for where that holds.
+- No coordination between writers: each hook process draws its own digits.
+- The log line stays exactly the allow-listed fields; no event id is needed to keep entries distinct.
+
+### Negative Consequences
+
+- Two identical events in the same millisecond still collapse, with a probability of one in a million per pair.
+  For usage counting this is negligible.
+- A re-push is documented to be dropped only while the original is still in the ingester's open chunk. A retry that
+  arrives later (after a long outage, or from a batch held for hours) may be counted twice. This is unverified in
+  either direction for this stack (a single ingester, replication factor 1), and is recorded as an open question in
+  `docs/quality-backlog.md`.
+- Correctness depends on Loki's duplicate handling. Enabling `increment_duplicate_timestamp` in `stack/loki.yaml`
+  would turn a re-pushed event into a second entry; it is off by default and must stay off.
+- Events written by a version of the plugin before `sub` existed get the position within the push instead. Those
+  timestamps are unique within a push but not stable across retries, so such events can be counted twice.
+- The sub-millisecond digits are not real time. Order within a millisecond is arbitrary.
+
+## Alternatives Considered
+
+### Millisecond timestamps only
+
+**Rejected because**: two identical events in the same millisecond would have identical timestamps and lines, and
+Loki would keep only one of them.
+
+### Timestamp taken at push time
+
+**Rejected because**: a retry would get a new timestamp, so every re-pushed batch would be counted twice.
+
+### A unique event id in the log line
+
+**Rejected because**: it adds a high-variety field to every line for no gain over `sub`, which achieves the same
+distinctness through the timestamp Loki already compares.
+
+### A per-writer counter
+
+**Rejected because**: writers are separate short-lived processes with no shared state; counters would repeat across
+processes, and sharing one would need the lock ADR 0002 avoids.

@@ -34,7 +34,8 @@ become `<batch>-late-<id>-<seen>.jsonl`. It is removed once it has gone 5 s with
 `-late-` names keep their parent's timestamp prefix, so they are claimed ahead of any newer batch, held rest before
 late writes, late writes in the order they were written. Settled files are short-lived copies
 and sit outside the 50 MB cap. No step in this sequence can lose events if it fails or the process dies; the worst
-case is a batch pushed twice, which Loki deduplicates. See the late-write consequence below.
+case is a batch pushed twice, which Loki deduplicates at least while the original is in the ingester's open chunk
+([0005](0005-retry-stable-event-timestamps.mdx)). See the late-write consequence below.
 
 ## Consequences
 

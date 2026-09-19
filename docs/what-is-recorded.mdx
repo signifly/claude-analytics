@@ -57,7 +57,8 @@ How a skill typed as a slash command is counted is part of **Kind** in the gloss
 - **The log line** is the event as JSON, without `ts` and `sub`: `kind`, `name`, `user`, `project`, `source`,
   and where present `session_id`, `subagent` and `mcp_server`.
 - **The entry's timestamp** is `ts` in nanoseconds, with `sub` as the sub-millisecond digits. A retried push sends
-  the same timestamp and line, which Loki treats as a duplicate.
+  the same timestamp and line, which Loki treats as a duplicate, at least while the original is in its open chunk
+  ([ADR 0005](architecture-decisions/0005-retry-stable-event-timestamps.mdx)).
 
 Skill runs per person over the last week:
 

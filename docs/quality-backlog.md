@@ -70,7 +70,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   _Done when:_ README is at most 60 lines and every section it dropped lives in a docs page.
 - [x] ADR (via /architect:adr): the flusher is spawned on demand by hooks and exits when idle, rather than a
   daemon (launchd/systemd) or a flusher per session. _Done when:_ the ADR is in `docs/architecture-decisions/`.
-- [ ] ADR (via /architect:adr): why events carry `sub` (retry-stable nanosecond timestamps). ADR 0002 already
+- [x] ADR (via /architect:adr): why events carry `sub` (retry-stable nanosecond timestamps). ADR 0002 already
   relies on Loki deduplicating re-pushes; this one records the timestamp scheme that makes that true and
   references 0002 rather than re-deciding it. _Done when:_ the ADR is in `docs/architecture-decisions/`, links
   ADRs 0002 and 0003, and matches `loki-sink.mjs` (ms timestamp plus `sub` padded to 6 digits; the index fallback
@@ -105,6 +105,14 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   then lose its event. ADR 0002 line 55 ("A writer stalled for longer than the grace period can still lose its
   event") reads as if shorter stalls were safe. Touching the file in `retire()` would make the grace period start
   at the settle: a behaviour change to the buffer, so not taken by the quality loop. Found in review of #8.
+
+- **Are late re-pushes deduplicated?** ADR 0005 and ADR 0002 rely on Loki dropping a re-pushed event. Loki's
+  docs promise two things: the ingester drops an exact duplicate of an entry in its open chunk, and the querier
+  merges what several replicas wrote. Neither covers a duplicate that arrives after the original's chunk was
+  flushed. A retry after the
+  chunk was flushed (outages, batches held for hours) may be counted twice. Worth checking against the stack: push an
+  event, force a flush (`POST /flush`), push it again, and count it with a query. If duplicates survive, options are
+  query-side dedup in the dashboard or accepting the overcount. Found in review of #18.
 
 ## Parked
 
