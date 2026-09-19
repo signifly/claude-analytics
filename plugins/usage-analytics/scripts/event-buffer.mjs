@@ -23,11 +23,13 @@ const DEFAULTS = {
 // order is age order.
 const SETTLED = /^(batch-.*\.jsonl)\.settled-(\d+)-(.+)$/;
 const stem = (batchName) => batchName.replace(/\.jsonl$/, "");
+// Written by a settle, cleaned up by the sweep: one suffix, so the two cannot drift apart.
+const TMP_SUFFIX = ".tmp";
 const names = {
   live: "events.jsonl",
   batch: /^batch-.*\.jsonl$/,
   settled: SETTLED,
-  tmp: /^batch-.*\.jsonl\.tmp$/,
+  tmp: new RegExp(`^batch-.*\\.jsonl${TMP_SUFFIX.replace(".", "\\.")}$`),
   // Claim time, then pid and a counter to keep it unique.
   claimed: (time, pid, seq) => `batch-${time}-${pid}-${String(seq).padStart(6, "0")}.jsonl`,
   // One "-held-" segment per lineage, however often it is partly settled:
@@ -44,7 +46,7 @@ const names = {
   },
   // The batch a held or late piece came from, without extension.
   origin: (batchName) => stem(batchName.replace(/-(held|late)-.*$/, "")),
-  tmpOf: (batchName) => `${batchName}.tmp`,
+  tmpOf: (batchName) => `${batchName}${TMP_SUFFIX}`,
 };
 
 export function openBuffer(dir, options = {}) {

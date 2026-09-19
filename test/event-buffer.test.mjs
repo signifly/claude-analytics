@@ -434,8 +434,13 @@ test("buffer files keep their on-disk names: claimed, held, settled and late", (
   ]);
 
   batch.settle({ handled: 1 }); // the held rest, partly settled again: still one "-held-" segment
-  assert.ok(listing().includes(`batch-${NOW}-${pid}-000000-held-${pid}-1.jsonl`), listing().join("\n"));
-  assert.ok(listing().includes(`batch-${NOW}-${pid}-000000-held-${pid}-0.jsonl.settled-${claimedBytes - Buffer.byteLength(JSON.stringify(event("a")) + "\n")}-${pid}-1`), listing().join("\n"));
+  const heldBytes = claimedBytes - Buffer.byteLength(JSON.stringify(event("a")) + "\n");
+  assert.deepEqual(listing(), [
+    `batch-${NOW}-${pid}-000000-held-${pid}-0.jsonl.settled-${heldBytes}-${pid}-1`,
+    `batch-${NOW}-${pid}-000000-held-${pid}-1.jsonl`,
+    `batch-${NOW}-${pid}-000000-late-${pid}-0-${String(claimedBytes).padStart(12, "0")}.jsonl`,
+    `batch-${NOW}-${pid}-000000.jsonl.settled-${claimedBytes + lateBytes}-${pid}-0`,
+  ]);
 });
 
 test("files left by an earlier run are read under their names: settled with late bytes, held, and their dead/ origin", () => {
