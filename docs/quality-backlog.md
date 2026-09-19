@@ -10,8 +10,8 @@ Items marked *(after #3)* wait until it has merged; skip past them to the next i
 does not block the next phase, but the "how it works" docs page is gated on #3 too, since it describes held naming.
 
 **Loaded run** (required for changes to event-buffer, drain, flush or flusher-lock):
-`for i in 1 2 3 4; do (while :; do :; done) & done; for i in $(seq 10); do node --test test/multi-process.test.mjs || break; done; kill %1 %2 %3 %4`
-passes all ten runs.
+`pids=; for i in 1 2 3 4; do (while :; do :; done) & pids="$pids $!"; done; ok=0; for i in $(seq 10); do node --test test/multi-process.test.mjs && ok=$((ok+1)); done; kill $pids; echo "$ok/10"`
+prints `10/10`.
 
 ## Phase 1: code quality
 
