@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import { drain } from "../plugins/usage-analytics/scripts/drain.mjs";
+import { openBuffer } from "../plugins/usage-analytics/scripts/event-buffer.mjs";
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -95,12 +99,7 @@ test("the lock is checked, and its heartbeat refreshed, before every push of a l
   assert.ok(h.beats() >= 200);
 });
 
-
 test("with the real flush pass: an outage, then recovery, delivers everything once and then goes idle", async () => {
-  const { openBuffer } = await import("../plugins/usage-analytics/scripts/event-buffer.mjs");
-  const fs = await import("node:fs");
-  const os = await import("node:os");
-  const path = await import("node:path");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drain-"));
   const buffer = openBuffer(dir);
   for (const name of ["a", "b", "c"]) buffer.append({ ts: Date.now(), sub: 1, kind: "tool", name });
