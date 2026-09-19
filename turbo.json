@@ -6,14 +6,14 @@
       "outputs": ["dist/**", ".next/**", "!.next/cache/**", ".source/**"]
     },
     "check": {
-      "inputs": ["package.json", "scripts/**"]
+      "cache": false
     },
     "test": {
       "dependsOn": ["^build"]
     },
     "//#test:root": {
       "cache": false,
-      "passThroughEnv": ["TMPDIR", "SMOKE_LOKI_URL"]
+      "passThroughEnv": ["TMPDIR"]
     }
   }
 }
