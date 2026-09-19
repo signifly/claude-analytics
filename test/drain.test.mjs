@@ -123,3 +123,23 @@ test("new events arriving count as activity even while the sink is down", async 
   await drain(h.options);
   assert.ok(h.sleeps.reduce((a, b) => a + b) > 20 * MINUTE); // the idle clock restarted while events kept arriving
 });
+
+test("a flusher whose buffer cannot be claimed still goes idle instead of running forever", { skip: process.getuid?.() === 0 && "root ignores permissions" }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "drain-"));
+  const buffer = openBuffer(dir);
+  buffer.append({ ts: Date.now(), sub: 1, kind: "tool", name: "stuck" });
+  fs.chmodSync(dir, 0o555);
+  try {
+    const h = harness();
+    const { flush, sleep, ...options } = h.options; // the real flushOnce
+    // Bounded, so a flusher that never goes idle fails the test instead of hanging it.
+    const bounded = async (ms) => {
+      if (h.sleeps.length >= 2000) throw new Error("still running after 2000 passes");
+      return sleep(ms);
+    };
+    assert.equal(await drain({ ...options, sleep: bounded, buffer, sink: { push: async () => "ok" } }), true);
+    assert.ok(h.sleeps.length <= 601, `${h.sleeps.length} passes`);
+  } finally {
+    fs.chmodSync(dir, 0o755);
+  }
+});
