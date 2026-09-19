@@ -8,6 +8,8 @@ import { describe } from "./log.mjs";
 
 // An answer resolved while git itself was failing is only trusted this long.
 const PROVISIONAL_MS = 2 * 60 * 1000;
+// How long a session's cached context is kept after its last use.
+const SESSION_CACHE_MS = 6 * 24 * 60 * 60 * 1000;
 
 export function sessionContext({ dir, sessionId, cwd, config, logOnce = () => {}, exec = execFileSync, now = Date.now }) {
   const sessionsDir = path.join(dir, "sessions");
@@ -69,7 +71,8 @@ export function sessionContext({ dir, sessionId, cwd, config, logOnce = () => {}
   return context;
 }
 
-export function pruneSessions(dir, maxAgeMs, log = () => {}) {
+// Removes cached session contexts untouched for longer than maxAgeMs.
+export function pruneSessions(dir, { maxAgeMs = SESSION_CACHE_MS, log = () => {} } = {}) {
   const sessionsDir = path.join(dir, "sessions");
   try {
     const cutoff = Date.now() - maxAgeMs;

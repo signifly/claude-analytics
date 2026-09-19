@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { sessionContext } from "../plugins/usage-analytics/scripts/session-context.mjs";
+import { pruneSessions, sessionContext } from "../plugins/usage-analytics/scripts/session-context.mjs";
 
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "session-context-"));
 const noConfig = { user: "", project: "", source: "dev" };
@@ -77,4 +77,37 @@ test("when git itself fails, the fallback answer is reused for a couple of minut
   assert.equal(sessionContext({ ...args, exec: healthy }).user, "dev@example.com");
   clock += 60 * 60 * 1000;
   assert.equal(sessionContext({ ...args, exec: broken }).user, "dev@example.com"); // now cached for good
+});
+
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+const cacheSession = (dir, sessionId, ageMs) => {
+  sessionContext({ dir, sessionId, cwd: "/w", config: noConfig, exec: fakeGit({}) });
+  const file = path.join(dir, "sessions", `${sessionId}.json`);
+  const then = new Date(Date.now() - ageMs);
+  fs.utimesSync(file, then, then);
+};
+const cachedSessions = (dir) => fs.readdirSync(path.join(dir, "sessions")).sort();
+
+test("pruning forgets sessions untouched for more than six days and keeps the rest", () => {
+  const dir = tmpDir();
+  cacheSession(dir, "just-over-six-days", 6 * DAY + HOUR);
+  cacheSession(dir, "just-under-six-days", 6 * DAY - HOUR);
+  cacheSession(dir, "today", 0);
+  pruneSessions(dir);
+  assert.deepEqual(cachedSessions(dir), ["just-under-six-days.json", "today.json"]);
+});
+
+test("pruning a data dir with no session cache yet is silent", () => {
+  const lines = [];
+  pruneSessions(tmpDir(), { log: (l) => lines.push(l) });
+  assert.deepEqual(lines, []);
+});
+
+test("a session cache that cannot be pruned is logged, not thrown", () => {
+  const dir = tmpDir();
+  fs.writeFileSync(path.join(dir, "sessions"), "not a directory");
+  const lines = [];
+  pruneSessions(dir, { log: (l) => lines.push(l) });
+  assert.match(lines.join("\n"), /cannot prune session cache/);
 });
