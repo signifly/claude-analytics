@@ -57,14 +57,15 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
 
 ## Phase 2: documentation content
 
-- [ ] Docs pages "what it is" and "install" (plugin, per-repo settings, Sandcastle). _Done when:_ both MDX pages
+- [x] Docs pages "what it is" and "install" (plugin, per-repo settings, Sandcastle). _Done when:_ both MDX pages
   exist under `docs/` with frontmatter and README links to them.
 - [ ] Docs page "what is recorded" (event shape, kinds, labels, the names-only rule). _Done when:_ the page exists,
-  links ADR 0003 and `CONTEXT.md`, and repeats no glossary definitions.
+  links ADR 0003 and `CONTEXT.md`, repeats no glossary definitions, and `docs/index.mdx` links to it.
 - [ ] Docs page "how it works" (hooks, buffer, flusher, failures, late writes, modules). _Done when:_ the page
-  exists and every module in the README Modules table is covered. *(after #3)*
+  exists, every module in the README Modules table is covered, and `docs/index.mdx` links to it. *(after #3)*
 - [ ] Docs page "operating the stack" (ports, auth, retention, dashboard, troubleshooting, native telemetry).
-  _Done when:_ the page exists and covers every README section on these topics.
+  _Done when:_ the page exists, covers every README section on these topics, and `docs/index.mdx` and
+  `docs/install.mdx` link to it instead of the README's "Run the stack" section.
 - [ ] Shrink `README.md` to an entry point that links into `docs/`; keep `CONTEXT.md` as the glossary.
   _Done when:_ README is at most 60 lines and every section it dropped lives in a docs page.
 - [ ] ADR (via /architect:adr): the flusher is spawned on demand by hooks and exits when idle, rather than a

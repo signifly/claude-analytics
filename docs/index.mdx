@@ -1,0 +1,36 @@
+---
+title: claude-analytics
+description: Usage analytics for Claude Code, covering which skills, commands, tools and subagents get run, by whom, and in which project.
+---
+
+# claude-analytics
+
+claude-analytics answers one question: **what gets used in Claude Code, by whom, and where?** It counts the
+skills, slash commands, tools, MCP tools and subagents that run in developer sessions and in autonomous
+(Sandcastle) agents, and shows them on a Grafana dashboard.
+
+It records **names, never content**. Prompt text, command arguments, tool inputs and outputs, file contents and
+file paths never leave the machine. [ADR 0003](architecture-decisions/0003-record-names-never-content.mdx) explains
+why.
+
+## The two halves
+
+- **The plugin** (`plugins/usage-analytics/`) is a Claude Code plugin with three async hooks. Each hook appends
+  one line to a local file and returns; a background flusher sends the lines to Loki in batches. A session never
+  waits on analytics, and an unreachable Loki never disturbs one.
+- **The stack** (`docker-compose.yml` and `stack/`) runs Loki, Grafana, Tempo, Mimir and an OpenTelemetry
+  collector, with a provisioned "Claude Code usage" dashboard.
+
+```
+Claude Code hooks ──append──▶ ~/.claude/analytics/events.jsonl ──flusher (1s batches)──▶ Loki ──▶ Grafana
+(async, no network)            shared, append-only buffer         one process per buffer dir
+```
+
+## Where to go next
+
+- [Install](install.mdx): add the plugin for yourself, a team repo, or an agent, and configure it.
+- [Architecture decisions](architecture-decisions/0001-hooks-and-local-buffer-over-native-telemetry.mdx): why it was
+  built this way.
+
+Terms such as *usage event*, *event buffer*, *batch* and *flusher* are defined in the
+[glossary](https://github.com/signifly/claude-analytics/blob/main/CONTEXT.md).
