@@ -10,7 +10,7 @@ After #3 merged (main at f434c4c): 146 pass, 1 skipped.
 are satisfied. Write the naming helper and the "how it works" page against the post-#3 code.
 
 **Loaded run** (required for changes to event-buffer, drain, flush or flusher-lock):
-`bash -c 'pids=; for i in 1 2 3 4; do (while :; do :; done) & pids="$pids $!"; done; trap "kill $pids 2>/dev/null" EXIT; ok=0; for i in $(seq 10); do node --test test/multi-process.test.mjs >/dev/null 2>&1 && ok=$((ok+1)); done; echo "$ok/10"'`
+`bash -c 'pids=; for i in 1 2 3 4; do (while :; do :; done) & pids="$pids $!"; done; trap "kill $pids 2>/dev/null" EXIT; ok=0; for i in $(seq 10); do node --test test/multi-process.test.mjs >/tmp/loaded-run.log 2>&1 && ok=$((ok+1)) || tail -40 /tmp/loaded-run.log; done; echo "$ok/10"'`
 prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `bash -c`: zsh does not word-split `$pids`).
 
 ## Phase 1: code quality
@@ -19,8 +19,8 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   to `pruneSessions(dir, maxAgeMs, log)`, so the entry point knows how long the cache of another module lives, and
   `pruneSessions` has no test at all. Change it to `pruneSessions(dir, { maxAgeMs = <default>, log } = {})`, test
   it at the interface (old entries go, fresh ones stay, a missing `sessions/` is silent, other errors are logged).
-  _Done when:_ `flush.mjs` calls `pruneSessions(dir, { log })` with no age, the default is still 6 days, and `test/session-context.test.mjs`
-  covers pruning.
+  _Done when:_ `flush.mjs` calls `pruneSessions(dir, { log })` with no age, the default is still 6 days, and
+  `test/session-context.test.mjs` covers pruning.
 - [ ] **The fallback log location has one owner.** `record-main.mjs` rebuilds `$TMPDIR/claude-analytics.log` to
   point the flusher's stderr at it, duplicating the fallback rule inside `log.mjs`. Have `createLog` expose the
   fallback path (or a `stderrTarget()` that opens the first writable of the two) and use it in `startFlusher`.
@@ -47,6 +47,11 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   helper-produced name is byte-identical to the pre-refactor format and that pre-refactor names parse; and the
   loaded run passes.
   *(after #3, which changes held naming)*
+- [ ] **One vanished session file does not end the whole prune.** In `pruneSessions` a single `statSync` that
+  hits ENOENT (a hook's `.tmp` renamed away between `readdirSync` and `statSync`) throws out of the loop, is
+  swallowed as "no cache", and skips every remaining file until the next flusher start. Handle each file on its
+  own. _Done when:_ a test with a dangling symlink in `sessions/` shows older entries after it are still pruned
+  and nothing is logged for the vanished one.
 
 ## Phase 2: documentation content
 

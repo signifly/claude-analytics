@@ -79,7 +79,8 @@ test("when git itself fails, the fallback answer is reused for a couple of minut
   assert.equal(sessionContext({ ...args, exec: broken }).user, "dev@example.com"); // now cached for good
 });
 
-const DAY = 24 * 60 * 60 * 1000;
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
 const cacheSession = (dir, sessionId, ageMs) => {
   sessionContext({ dir, sessionId, cwd: "/w", config: noConfig, exec: fakeGit({}) });
   const file = path.join(dir, "sessions", `${sessionId}.json`);
@@ -90,11 +91,11 @@ const cachedSessions = (dir) => fs.readdirSync(path.join(dir, "sessions")).sort(
 
 test("pruning forgets sessions untouched for more than six days and keeps the rest", () => {
   const dir = tmpDir();
-  cacheSession(dir, "last-week", 7 * DAY);
-  cacheSession(dir, "five-days-ago", 5 * DAY);
+  cacheSession(dir, "just-over-six-days", 6 * DAY + HOUR);
+  cacheSession(dir, "just-under-six-days", 6 * DAY - HOUR);
   cacheSession(dir, "today", 0);
   pruneSessions(dir);
-  assert.deepEqual(cachedSessions(dir), ["five-days-ago.json", "today.json"]);
+  assert.deepEqual(cachedSessions(dir), ["just-under-six-days.json", "today.json"]);
 });
 
 test("pruning a data dir with no session cache yet is silent", () => {
