@@ -1,0 +1,72 @@
+---
+title: ✅ pnpm workspace, with the plugin left where it is
+description: The repo becomes a pnpm workspace (and then a Turborepo) so a docs app can sit beside the plugin, while the plugin stays at plugins/usage-analytics as zero-dependency plain .mjs with no build step.
+---
+
+# 0006. pnpm workspace, with the plugin left where it is
+
+Date: 2026-09-19
+Author: Emil Hørlyck
+
+## Status
+
+Accepted
+
+## Context
+
+The repo holds one Claude Code plugin, a docker compose stack, tests and docs. A docs site built from `docs/` is
+next, and it brings its own dependencies and build. Those must not leak into the plugin: installing it has to stay
+"copy some `.mjs` files", with nothing to install and nothing to build (see [0001](0001-hooks-and-local-buffer-over-native-telemetry.mdx)).
+
+Forces:
+
+- `.claude-plugin/marketplace.json` points at `./plugins/usage-analytics`, and installed users resolve the plugin by
+  that path. Moving it breaks every existing install.
+- The plugin runs on `node` 18 or newer on every developer machine and agent container; CI tests it on 18 and 22.
+- The docs app and later packages need dependencies, and tasks (`test`, `check`, `build`) that run per package.
+- A developer should run the same commands locally that CI runs.
+
+## Decision
+
+Make the repo a pnpm workspace. `pnpm-workspace.yaml` lists `plugins/*`, so the plugin is a workspace package
+without moving. It gets a `package.json` with no dependencies and only a `check` script. The root `package.json`
+pins the package manager (`pnpm@10.34.5`, which supports Node 18) and keeps the tests, which exercise the plugin
+from the outside.
+
+Turborepo follows in separate steps: a `turbo.json` with `test`, `check` and `build` tasks, then CI running through
+it. Each step leaves `main` working, and the root npm scripts keep working until CI has moved.
+
+The plugin itself does not change: plain `.mjs`, no dependencies, no build step, no `node_modules` needed at
+runtime.
+
+## Consequences
+
+### Positive Consequences
+
+- A docs app, or any later tool, can join the repo with its own dependencies without touching the plugin.
+- Existing installs and the marketplace keep working: the plugin's path, manifest and files are unchanged.
+- One command set for local work and CI, once CI runs through turbo.
+
+### Negative Consequences
+
+- Contributors need pnpm (via corepack or an install) for workspace commands; npm alone covers only the root scripts.
+- The plugin directory now contains a `package.json` that Claude Code does not use. It must stay free of
+  dependencies, or an installed plugin would reference modules that were never installed.
+- pnpm is held at 10.x while Node 18 is supported: newer major versions raise their minimum Node version.
+
+## Alternatives Considered
+
+### Move the plugin to `packages/usage-analytics`
+
+**Rejected because**: the marketplace manifest and every installed user resolve `plugins/usage-analytics`; a move
+breaks installs for no gain, since a workspace glob can include the current path.
+
+### npm workspaces
+
+**Rejected because**: pnpm's strict, content-addressed `node_modules` keeps a docs app's dependencies out of the
+plugin's reach, and Turborepo's pnpm support is the best trodden path. npm would work, with looser isolation.
+
+### A separate repo for the docs site
+
+**Rejected because**: the docs are meant to read `docs/` in place, next to the code and ADRs they describe; a
+second repo would need a copy or a submodule and would drift.

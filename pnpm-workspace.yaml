@@ -1,0 +1,3 @@
+# The plugin stays at plugins/usage-analytics: .claude-plugin/marketplace.json and installed users point there.
+packages:
+  - "plugins/*"

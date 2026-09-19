@@ -78,7 +78,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
 
 ## Phase 3: Turborepo
 
-- [ ] pnpm workspaces: root `pnpm-workspace.yaml` with `plugins/*`, plugin `package.json` (zero deps, no build),
+- [x] pnpm workspaces: root `pnpm-workspace.yaml` with `plugins/*`, plugin `package.json` (zero deps, no build),
   lockfile; `pnpm test` / `pnpm check` work; CI still on npm scripts. ADR for the move.
   _Done when:_ `pnpm install && pnpm test && pnpm check` pass from a clean clone and the ADR is in `docs/architecture-decisions/`.
 - [ ] turbo: `turbo.json` with `test`, `check`, `build`; root scripts delegate to turbo.
