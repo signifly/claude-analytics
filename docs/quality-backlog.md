@@ -63,7 +63,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   links ADR 0003 and `CONTEXT.md`, repeats no glossary definitions, and `docs/index.mdx` links to it.
 - [x] Docs page "how it works" (hooks, buffer, flusher, failures, late writes, modules). _Done when:_ the page
   exists, every module in the README Modules table is covered, and `docs/index.mdx` links to it. *(after #3)*
-- [ ] Docs page "operating the stack" (ports, auth, retention, dashboard, troubleshooting, native telemetry).
+- [x] Docs page "operating the stack" (ports, auth, retention, dashboard, troubleshooting, native telemetry).
   _Done when:_ the page exists, covers every README section on these topics, and `docs/index.mdx` and
   `docs/install.mdx` link to it instead of the README's "Run the stack" section.
 - [ ] Shrink `README.md` to an entry point that links into `docs/`; keep `CONTEXT.md` as the glossary.

@@ -7,7 +7,7 @@ description: Add the usage-analytics plugin for one developer, a whole team repo
 
 The plugin needs `node` 18 or newer on the machine or container that runs Claude Code, on the `PATH` that hooks
 run with. It has no other dependencies. Events go to a Loki; to run one locally, see
-[Run the stack](https://github.com/signifly/claude-analytics#run-the-stack) in the README.
+[Operating the stack](operating-the-stack.mdx).
 
 ## For yourself
 
@@ -68,7 +68,7 @@ await sandcastle.run({
 - The `host.docker.internal` URL above only works if the stack's ports are reachable from the container. With
   the stack's default loopback binding they may not be. Point the container at a shared Loki,
   or start the stack with `BIND_ADDRESS=0.0.0.0` (read
-  [Run the stack](https://github.com/signifly/claude-analytics#run-the-stack) first).
+  [Serving a team](operating-the-stack.mdx#serving-a-team) first).
 
 ## Configuration
 

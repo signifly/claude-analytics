@@ -1,0 +1,76 @@
+---
+title: Operating the stack
+description: Run the Loki, Grafana, Tempo and Mimir stack with docker compose. Covers its ports, exposing it to a team safely, retention, the dashboard, native Claude Code telemetry, and checking that events arrive.
+---
+
+# Operating the stack
+
+The **stack** is a docker compose deployment: Loki, Grafana, Tempo, Mimir and an OpenTelemetry collector, with a
+provisioned "Claude Code usage" dashboard. It lives in `docker-compose.yml` and `stack/`.
+
+## Run it
+
+```sh
+docker compose up -d
+open http://localhost:3030        # Grafana, opens on the usage dashboard (anonymous viewer; admin/admin to log in)
+```
+
+| Service | Port | Override |
+|---|---|---|
+| Grafana | 3030 | `GRAFANA_PORT`, `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ANONYMOUS=false` |
+| Loki push/query | 3100 | `LOKI_PORT` (then also change `CLAUDE_ANALYTICS_LOKI_URL` for the plugin) |
+| OTLP gRPC / HTTP | 4317 / 4318 | `OTLP_GRPC_PORT`, `OTLP_HTTP_PORT` |
+
+Tempo and Mimir are not published; Grafana and the collector reach them inside the compose network.
+
+## Serving a team
+
+All ports are published on **127.0.0.1 only**. To make the stack reachable from other machines or containers, set
+`BIND_ADDRESS=0.0.0.0`. Before you do:
+
+- set a real admin password with `GRAFANA_ADMIN_PASSWORD`;
+- set `GRAFANA_ANONYMOUS=false`, since anonymous viewers are on by default;
+- put Loki behind auth. It has none of its own. The plugin's flusher can send a bearer token, basic auth and a
+  tenant header (see [Install](install.mdx#configuration)).
+
+## Retention
+
+| Store | Keeps | Set in |
+|---|---|---|
+| Loki (usage events) | 90 days; rejects samples older than 7 days | `stack/loki.yaml` |
+| Tempo (traces) | 7 days | `stack/tempo.yaml` |
+| Mimir (metrics) | unlimited | `stack/mimir.yaml` |
+
+The plugin skips events older than 6 days, so a backlog that finally reaches Loki is never rejected as too old.
+If you lower Loki's `reject_old_samples_max_age`, lower the plugin's limit with it.
+
+## The dashboard
+
+The "Claude Code usage" dashboard is provisioned from `stack/grafana/dashboards/`. Edit the JSON there: changes
+made in the Grafana UI are not persisted. [What is recorded](what-is-recorded.mdx) describes the labels and log
+lines to query.
+
+## Native Claude Code telemetry (optional)
+
+The collector also accepts Claude Code's built-in OpenTelemetry export (token and cost metrics, tool events) into
+the same Loki, Mimir and Tempo. Delta metrics are converted to cumulative for Mimir.
+
+```sh
+CLAUDE_CODE_ENABLE_TELEMETRY=1 OTEL_METRICS_EXPORTER=otlp OTEL_LOGS_EXPORTER=otlp \
+OTEL_EXPORTER_OTLP_PROTOCOL=grpc OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 claude
+```
+
+This runs alongside the plugin; it does not replace it. See
+[ADR 0001](architecture-decisions/0001-hooks-and-local-buffer-over-native-telemetry.mdx) for why.
+
+## Checking that events arrive
+
+- Loki answers `http://localhost:3100/ready` once it is up.
+- An end-to-end check pipes a hook payload through the real hook into a real Loki:
+
+  ```sh
+  SMOKE_LOKI_URL=http://localhost:3100 node --test test/smoke.test.mjs
+  ```
+
+- If events do not show up, the plugin's log explains why. See
+  [Troubleshooting](how-it-works.mdx#troubleshooting).
