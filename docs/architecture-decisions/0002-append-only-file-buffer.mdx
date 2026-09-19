@@ -30,8 +30,9 @@ their count is logged.
 
 A settled batch is not deleted. Its held rest, if any, is first written to `<batch>-held-<id>.jsonl`; then the file
 is renamed to `<batch>.jsonl.settled-<bytes seen>-<id>` and checked on every claim. If it has grown, the extra bytes
-become `<batch>-late-<id>-<seen>.jsonl`. It is removed once it has gone 5 s without a write. The `-held-` and
-`-late-` names sort right after their parent, so name order stays age order. Settled files are short-lived copies
+become `<batch>-late-<id>-<seen>.jsonl`. It is removed once it has gone 5 s without a write. A lineage keeps a single `-held-` segment however often it is partly settled, so names stay bounded. `-held-` and
+`-late-` names keep their parent's timestamp prefix, so they are claimed ahead of any newer batch, held rest before
+late writes, late writes in the order they were written. Settled files are short-lived copies
 and sit outside the 50 MB cap. No step in this sequence can lose events if it fails or the process dies; the worst
 case is a batch pushed twice, which Loki deduplicates. See the late-write consequence below.
 
