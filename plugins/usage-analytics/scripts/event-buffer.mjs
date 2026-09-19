@@ -54,6 +54,13 @@ export function openBuffer(dir, options = {}) {
   const deadDir = path.join(dir, "dead");
   let claims = 0;
   let retired = 0;
+  // The live file as it was when a claim of it last failed (read-only data dir,
+  // permissions): not pending again until it changes, or the flusher never idles.
+  let unclaimable = null;
+  const liveSignature = () => {
+    const info = stat(liveFile);
+    return info ? `${info.size}:${info.mtimeMs}` : null;
+  };
 
   // A missing file is an ordinary answer; any other failure is reported (once
   // per kind per process), because "0" or "nothing" would otherwise pass for an empty buffer.
@@ -260,7 +267,7 @@ export function openBuffer(dir, options = {}) {
     // the grace period is a sweep that keeps failing (logged), and must not keep
     // the flusher alive. claim() goes on trying it regardless.
     pending: () =>
-      size(liveFile) > 0 ||
+      (size(liveFile) > 0 && liveSignature() !== unclaimable) ||
       list(dir, names.settled).some((file) => lateBytes(file) > 0 && Date.now() - mtime(file) < 3 * settleGraceMs),
 
     // Claims the live file by renaming it (writers reopen the path per event,
@@ -273,8 +280,12 @@ export function openBuffer(dir, options = {}) {
           do target = path.join(dir, names.claimed(now(), process.pid, claims++));
           while (fs.existsSync(target));
           fs.renameSync(liveFile, target);
+          unclaimable = null;
         } catch (err) {
-          if (err?.code !== "ENOENT") log(`cannot claim buffer: ${describe(err)}`);
+          if (err?.code !== "ENOENT") {
+            unclaimable = liveSignature();
+            unexpected("claim buffer", err); // once per kind, not on every pass
+          }
         }
       }
       sweepSettled();

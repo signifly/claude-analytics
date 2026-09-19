@@ -455,3 +455,23 @@ test("files left by an earlier run are read under their names: settled with late
   for (const batch of batches) batch.settle({ rejected: batch.events });
   assert.deepEqual(fs.readdirSync(path.join(dir, "dead")), ["rejected-batch-1690000000000-11-000003.jsonl"]);
 });
+
+const asRoot = process.getuid?.() === 0 && "root ignores permissions";
+
+test("a live file that cannot be claimed stops counting as pending until it changes, and is reported once", { skip: asRoot }, () => {
+  const dir = tmpDir();
+  const lines = [];
+  const buffer = open(dir, { log: (l) => lines.push(l) });
+  buffer.append(event("stuck"));
+  fs.chmodSync(dir, 0o555); // the live file can no longer be renamed away
+  try {
+    for (let i = 0; i < 3; i++) buffer.claim();
+    assert.equal(buffer.pending(), false);
+    assert.equal(lines.filter((l) => l.includes("cannot claim")).length, 1, lines.join("\n"));
+    buffer.append(event("new")); // the file itself is still writable
+    assert.equal(buffer.pending(), true);
+  } finally {
+    fs.chmodSync(dir, 0o755);
+  }
+  assert.deepEqual(names(buffer.claim()), ["stuck", "new"]); // nothing was lost
+});

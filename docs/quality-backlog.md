@@ -33,6 +33,21 @@ All phase 1–4 items above are done. A fresh audit found one item worth a PR an
   throttle markers to `/tmp` on every run. _Done when:_ every hook test runs with its own `TMPDIR`, the no-HOME and
   blocked-dir cases assert their buffer and log land there, and a run adds nothing to `/tmp/claude-analytics*`.
 
+## Audit 4 (2026-09-19, main at c8b46df)
+
+- [x] **A live file the flusher cannot claim does not keep it alive forever.** `pending()` counts any non-empty live
+  file, and a failed claim (e.g. a read-only data dir) is logged on every pass and never fails the pass, so drain
+  neither backs off nor reaches its idle exit: reproduced at 5000 passes and 5000 `cannot claim buffer` lines,
+  against `docs/how-it-works.mdx` and ADR 0004. The live-file twin of #3's late-write fix. _Done when:_ with a
+  read-only data dir, `pending()` is false after a failed claim and true again after a new append, repeated claims
+  log once, a drain with the real buffer goes idle (tests skipped as root, failing before the fix), and the loaded
+  run passes.
+- [ ] **A log that cannot rotate stops growing.** `log.mjs` swallows a failed rotation and appends anyway, so a
+  `flusher.log` in a data dir that is not writable grows past its cap and never falls back (reproduced: 7439 bytes
+  against a 300-byte cap), against `docs/how-it-works.mdx`. _Done when:_ with an over-cap `flusher.log` in a
+  read-only data dir, the file does not grow and later lines land in the capped fallback (test skipped as root,
+  failing before the fix).
+
 ## Phase 1: code quality
 
 - [x] **Session cache retention belongs to session-context.** `flush.mjs` defines `SESSION_CACHE_MS` and passes it
