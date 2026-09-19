@@ -7,8 +7,8 @@ developer sessions and autonomous (Sandcastle) agents. This repo hosts both halv
 - **`docker-compose.yml` + `stack/`** – the LGTM stack (Loki, Grafana, Tempo, Mimir) plus an OTel collector,
   with a provisioned "Claude Code usage" dashboard.
 
-Documentation lives in [`docs/`](docs/index.mdx): start with [what it is](docs/index.mdx) and
-[install](docs/install.mdx).
+Documentation lives in [`docs/`](docs/): start with [what it is](docs/index.mdx), [install](docs/install.mdx)
+and [what is recorded](docs/what-is-recorded.mdx).
 
 ```
 Claude Code hooks ──append──▶ ~/.claude/analytics/events.jsonl ──flusher (1s batches)──▶ Loki ──▶ Grafana

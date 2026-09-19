@@ -59,7 +59,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
 
 - [x] Docs pages "what it is" and "install" (plugin, per-repo settings, Sandcastle). _Done when:_ both MDX pages
   exist under `docs/` with frontmatter and README links to them.
-- [ ] Docs page "what is recorded" (event shape, kinds, labels, the names-only rule). _Done when:_ the page exists,
+- [x] Docs page "what is recorded" (event shape, kinds, labels, the names-only rule). _Done when:_ the page exists,
   links ADR 0003 and `CONTEXT.md`, repeats no glossary definitions, and `docs/index.mdx` links to it.
 - [ ] Docs page "how it works" (hooks, buffer, flusher, failures, late writes, modules). _Done when:_ the page
   exists, every module in the README Modules table is covered, and `docs/index.mdx` links to it. *(after #3)*
