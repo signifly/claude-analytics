@@ -1,0 +1,107 @@
+---
+title: How it works
+description: How a hook event becomes a line in Loki. Covers the hooks, the event buffer, the flusher and its lock, what happens when delivery fails, and the modules that implement each part.
+---
+
+# How it works
+
+A hook appends one line to a local file and exits. A separate process, the flusher, moves those lines to Loki in
+batches. Everything between the two is the **event buffer**, a handful of files in the **data dir**. Words in bold
+are defined in the [glossary](https://github.com/signifly/claude-analytics/blob/main/CONTEXT.md).
+
+## Hooks
+
+The plugin registers three hooks in `hooks/hooks.json`: `SessionStart`, `UserPromptSubmit` and `PostToolUse`.
+All three are `"async": true`, so a session never waits on analytics.
+
+Each hook runs `scripts/record.mjs`, which:
+
+1. reads the hook payload from stdin and turns it into at most one usage event (see
+   [What is recorded](what-is-recorded.mdx));
+2. appends that event as one JSON line to the **live file**, `events.jsonl`, and does no network I/O;
+3. starts a flusher if none is running, at most once every 5 seconds.
+
+Whatever happens, the hook exits 0 and prints nothing, even if the plugin is half-updated and its modules fail to
+load. Problems go to the log instead (see [Troubleshooting](#troubleshooting)). The live file refuses new events
+while it is over 50 MB.
+
+The identity tag and project are resolved once per session and cached under `<data dir>/sessions/`, so later
+events skip the git lookups. If git itself fails (missing, timing out), the fallback answer is cached for only
+two minutes. Cached sessions are pruned after 6 days without being resolved again.
+
+## The flusher
+
+One flusher runs per data dir, guarded by the **flusher lock**: a pid file with a heartbeat.
+
+- A crashed flusher is replaced by the next hook event.
+- A lock whose pid is alive but whose heartbeat is more than 3 minutes old (a recycled pid, a hung process) is taken
+  over too.
+- The flusher inherits the Loki settings of the session that started it.
+
+Every flush interval (1 s by default) the flusher **claims** the live file by renaming it to a `batch-*.jsonl`
+file; writers reopen the path for every event, so new events land in a fresh live file. It then **pushes** every
+held batch to Loki's `/loki/api/v1/push`, oldest first, in chunks of about 1 MiB, and **settles** each one.
+
+It exits after 10 minutes in which no new events arrived and no events left the buffer. Held batches during an
+outage do not keep it alive; the next hook event starts a new flusher that retries them.
+
+## When delivery fails
+
+| What happened | What the flusher does |
+|---|---|
+| Network error, timeout, 5xx, 429, any other unexpected status | Keeps the unhandled events **held** and retries with backoff: twice the flush interval, doubling up to 60 s. It resumes after the last handled chunk. Newer batches wait behind the held one, so order is kept. |
+| 401, 403, 404, 407 | As above, and the log line adds a "check URL / credentials" hint. |
+| 400, 413, 422 (Loki will never accept these events) | Moves the events to `<data dir>/dead/` and moves on. |
+| A batch that cannot be read | Moves it to `dead/` so it does not block the batches behind it. |
+| Events older than 6 days | Skips them, since Loki rejects samples older than 7 days. |
+| Unparseable lines (e.g. a torn write) | Skips them and counts them in the log. |
+
+The **backlog** is capped: held batches over 50 MB lose their oldest first (the newest is never evicted), and
+`dead/` is capped at 20 MB, oldest-modified first. Every one of these outcomes leaves a line in the log. Events
+only ever leave the buffer undelivered with a log line.
+
+## Late writes
+
+A slow hook process can open the live file just before a claim and write to it after. That write lands in a
+batch the flusher has already claimed, or even settled. The buffer catches both cases:
+
+- before the settle, the extra bytes are a *late tail* and stay held;
+- after it, the settled batch is kept as a `.settled-*` file and watched. Late bytes become a batch of their own.
+
+A settled batch is removed once it has gone the **grace period** (5 s) without any write. The details, and the one
+case in which a stalled writer can still lose an event, are in
+[ADR 0002](architecture-decisions/0002-append-only-file-buffer.mdx).
+
+No step in this sequence loses events if it fails or the process dies. The worst case is a batch pushed twice,
+which Loki deduplicates, because a retried event carries the same timestamp and line.
+
+## Modules
+
+All under `plugins/usage-analytics/scripts/`.
+
+| Module | Owns |
+|---|---|
+| `usage-event.mjs` | `toEvent(payload, context)`: kinds, names, the allow-list that keeps content out, and the Loki label list |
+| `event-buffer.mjs` | `openBuffer(dir)` → `append` / `pending` / `claim` / `batch.settle`: the live file, batches, `dead/`, caps, expiry, late writes, and the file names they use |
+| `flusher-lock.mjs` | `mayStartFlusher` for the hook; `acquire` → `stillMine` / `release` for the flusher: one flusher per data dir |
+| `flush-once.mjs` | `flushOnce(buffer, sink)`: one pass, covering chunking, resume and rejection handling |
+| `drain.mjs` | the flusher loop: interval, backoff, idle exit, and a lock check before every push |
+| `loki-sink.mjs` | the Loki adapter for the **sink**: stream grouping, timestamps, auth, and which status codes retry |
+| `session-context.mjs` | identity and project lookup, the session cache and its pruning |
+| `config.mjs` | every `CLAUDE_ANALYTICS_*` environment variable |
+| `log.mjs` | diagnostics: the log file, its fallback, and throttled messages |
+| `record.mjs` → `record-main.mjs` | the hook entry point: a guard that always exits 0 silently, around the real work |
+| `flush.mjs` | the flusher process |
+
+Tests live at these interfaces. The buffer and the lock run against temp dirs, the flusher against an in-memory
+sink, and the Loki adapter against an injected `fetch`.
+
+## Troubleshooting
+
+- `~/.claude/analytics/flusher.log` records flusher start and exit, lost or taken-over locks, config warnings,
+  failed and recovered pushes with their cause, rejected events, evictions, skipped lines, a full live file, and
+  the flusher's stderr if it crashes. It rotates to `.log.1` at 1 MB. If the data dir is not writable, it falls
+  back to `$TMPDIR/claude-analytics.log`, with the same cap. Hook-side messages are limited to one per kind per
+  hour.
+- Leftover `batch-*.jsonl` files mean Loki was unreachable or misconfigured. The next flusher retries them.
+- Nothing arriving and no log at all usually means `node` is not on the `PATH` that Claude Code hooks run with.
