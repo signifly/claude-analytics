@@ -26,11 +26,15 @@ export function createLog(dir, { fallbackDir = os.tmpdir(), maxBytes = MAX_LOG_B
   const file = path.join(dir, "flusher.log");
   const fallbackFile = path.join(fallbackDir, "claude-analytics.log");
 
-  // Appends with a size cap: the previous generation is kept as <file>.1.
+  // Appends with a size cap: the previous generation is kept as <file>.1. A file
+  // that is over the cap and cannot be rotated throws, so the line goes to the
+  // fallback (which has the same cap) instead of growing the file without limit.
   function write(target, line) {
+    let size = 0;
     try {
-      if (fs.statSync(target).size > maxBytes) fs.renameSync(target, `${target}.1`);
-    } catch {}
+      size = fs.statSync(target).size;
+    } catch {} // not there yet: nothing to rotate
+    if (size > maxBytes) fs.renameSync(target, `${target}.1`);
     fs.appendFileSync(target, line);
   }
 
