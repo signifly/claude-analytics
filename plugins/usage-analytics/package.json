@@ -1,0 +1,9 @@
+{
+  "name": "usage-analytics",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "check": "for f in scripts/*.mjs; do node --check \"$f\" || exit 1; done"
+  }
+}
