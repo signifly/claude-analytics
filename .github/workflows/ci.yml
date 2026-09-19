@@ -18,11 +18,15 @@ jobs:
             node: 22
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6 # version comes from packageManager in package.json
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - run: npm run check
-      - run: npm test
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check # turbo run check
+      - run: pnpm test # turbo run test test:root
+      - run: pnpm build # turbo run build
 
   stack:
     runs-on: ubuntu-latest

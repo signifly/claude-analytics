@@ -34,8 +34,9 @@ without moving. It gets a `package.json` with no dependencies and only a `check`
 pins the package manager (`pnpm@10.34.5`, which supports Node 18.12 and newer) and keeps the tests, which exercise
 the plugin from the outside.
 
-Turborepo follows in separate steps: a `turbo.json` with `test`, `check` and `build` tasks, then CI running through
-it. Each step leaves `main` working, and the root npm scripts keep working until CI has moved.
+Turborepo follows: a `turbo.json` with `test`, `check` and `build` tasks, which the root scripts and CI run
+through. The root scripts only keep working under plain npm until they delegate to turbo, so that change and the CI
+change land together, leaving `main` working at every step.
 
 The plugin itself does not change: plain `.mjs`, no dependencies, no build step, no `node_modules` needed at
 runtime.
@@ -46,11 +47,12 @@ runtime.
 
 - A docs app, or any later tool, can join the repo with its own dependencies without touching the plugin.
 - Existing installs and the marketplace keep working: the plugin's path, manifest and runtime code are unchanged.
-- One command set for local work and CI, once CI runs through turbo.
+- One command set for local work and CI, both running through turbo.
 
 ### Negative Consequences
 
-- Contributors need pnpm (via corepack or an install) for workspace commands; npm alone covers only the root scripts.
+- Contributors need pnpm (via corepack or an install), and a `pnpm install` before the first run: the root scripts
+  call turbo.
 - The plugin directory now contains a `package.json` that Claude Code does not use. It must stay free of
   dependencies, or an installed plugin would reference modules that were never installed.
 - pnpm is pinned to 10.x. pnpm 11 requires Node 22.13 or newer and would not run in the Node 18 CI job. pnpm 12
