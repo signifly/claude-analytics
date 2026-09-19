@@ -97,8 +97,8 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
 
 - **Should the grace period count from the settle?** `sweepSettled` in `event-buffer.mjs` removes a settled
   batch once its file has gone `settleGraceMs` without a write, measured from the file's mtime. Settling does not
-  touch the mtime, so a batch whose last write was more than 5 s before its settle is removed on the next claim,
-  milliseconds after the settle. A writer that opened the live file just before the claim and stalls briefly can
+  touch the mtime, so a batch whose last write is 5 s old by the next claim's sweep is removed there, one flush
+  interval (1 s by default, longer while backing off) after its settle instead of 5 s after it. A writer that opened the live file just before the claim and stalls briefly can
   then lose its event. ADR 0002 line 55 ("A writer stalled for longer than the grace period can still lose its
   event") reads as if shorter stalls were safe. Touching the file in `retire()` would make the grace period start
   at the settle: a behaviour change to the buffer, so not taken by the quality loop. Found in review of #8.

@@ -28,7 +28,7 @@ Domain language for claude-analytics. Use these terms exactly in code, tests, do
 
 **Batch** — a claimed slice of the buffer (`batch-*.jsonl`): renamed away from the live file so writers and the flusher don't contend. The one overlap — a slow writer appending to a file that was already claimed, or even settled — is caught: see **Late write**.
 
-**Grace period** — how long a settled batch must go without any write before it is removed; every late write restarts it. It counts from the batch's last write, not from its settle, so a batch that was quiet before it was settled can be removed at once, and a slow writer that only now gets to write can lose its event.
+**Grace period** — how long a settled batch must go without any write before it is removed; every late write restarts it. It counts from the batch's last write, not from its settle, so a batch that was quiet before it was settled can be removed at the next claim, and a slow writer that only now gets to write can lose its event.
 
 **Late write** — an event a slow writer puts into a batch file after the claim. Before the settle it is a *late tail* and stays held; after it, the settled file is still being watched and the bytes become a batch of their own.
 
