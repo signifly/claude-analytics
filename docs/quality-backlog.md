@@ -4,13 +4,13 @@ Working memory for the quality loop. Read this first every iteration; take the t
 current phase. One item = one PR, branched as `quality/<slug>`.
 
 Audit 1: 2026-09-19, against main at 9584787. Main green: 143 pass, 1 skipped (smoke, needs Loki).
-After #3 merged (main at f434c4c): 146 pass, 1 skipped.
+After #3 and #4 merged (main at f434c4c): 146 pass, 1 skipped.
 
 **Coordination:** Emil's PR #3 (`fix-held-name-nesting`) merged on 2026-09-19, so the *(after #3)* marks below
 are satisfied. Write the naming helper and the "how it works" page against the post-#3 code.
 
 **Loaded run** (required for changes to event-buffer, drain, flush or flusher-lock):
-`bash -c 'pids=; for i in 1 2 3 4; do (while :; do :; done) & pids="$pids $!"; done; trap "kill $pids 2>/dev/null" EXIT; ok=0; for i in $(seq 10); do node --test test/multi-process.test.mjs >/tmp/loaded-run.log 2>&1 && ok=$((ok+1)) || tail -40 /tmp/loaded-run.log; done; echo "$ok/10"'`
+`bash -c 'pids=; for i in 1 2 3 4; do (while :; do :; done) & pids="$pids $!"; done; log=$(mktemp); trap "exec 2>/dev/null; kill $pids; rm -f $log" EXIT; ok=0; for i in $(seq 10); do node --test test/multi-process.test.mjs >"$log" 2>&1 && ok=$((ok+1)) || tail -40 "$log"; done; echo "$ok/10"'`
 prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `bash -c`: zsh does not word-split `$pids`).
 
 ## Phase 1: code quality
@@ -21,7 +21,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
   it at the interface (old entries go, fresh ones stay, a missing `sessions/` is silent, other errors are logged).
   _Done when:_ `flush.mjs` calls `pruneSessions(dir, { log })` with no age, the default is still 6 days, and
   `test/session-context.test.mjs` covers pruning.
-- [ ] **The fallback log location has one owner.** `record-main.mjs` rebuilds `$TMPDIR/claude-analytics.log` to
+- [x] **The fallback log location has one owner.** `record-main.mjs` rebuilds `$TMPDIR/claude-analytics.log` to
   point the flusher's stderr at it, duplicating the fallback rule inside `log.mjs`. Have `createLog` expose the
   fallback path (or a `stderrTarget()` that opens the first writable of the two) and use it in `startFlusher`.
   _Done when:_ among `plugins/usage-analytics/scripts/`, the string `claude-analytics.log` appears only in
@@ -50,8 +50,9 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
 - [ ] **One vanished session file does not end the whole prune.** In `pruneSessions` a single `statSync` that
   hits ENOENT (a hook's `.tmp` renamed away between `readdirSync` and `statSync`) throws out of the loop, is
   swallowed as "no cache", and skips every remaining file until the next flusher start. Handle each file on its
-  own. _Done when:_ a test with a dangling symlink in `sessions/` shows older entries after it are still pruned
-  and nothing is logged for the vanished one.
+  own. _Done when:_ a test with a dangling symlink and several old entries in `sessions/` shows every old entry
+  pruned and nothing logged (several entries, because `readdirSync` order is filesystem-defined), and the test
+  fails before the fix.
 
 ## Phase 2: documentation content
 

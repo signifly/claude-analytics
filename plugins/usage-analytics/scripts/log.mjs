@@ -69,5 +69,16 @@ export function createLog(dir, { fallbackDir = os.tmpdir(), maxBytes = MAX_LOG_B
     }
   }
 
-  return { file, log, logOnce };
+  // A file descriptor for a child process's stderr, so a crash before it can
+  // log for itself still leaves a trace. "ignore" when neither log is writable.
+  function stderrTarget() {
+    for (const target of [file, fallbackFile]) {
+      try {
+        return fs.openSync(target, "a");
+      } catch {}
+    }
+    return "ignore";
+  }
+
+  return { file, log, logOnce, stderrTarget };
 }

@@ -39,3 +39,27 @@ test("any thrown value becomes one readable line", () => {
   assert.equal(typeof describe(Object.create(null)), "string");
   assert.equal(typeof describe(undefined), "string");
 });
+
+test("a child process's stderr goes to the log, or to the fallback log when the data dir is unwritable", () => {
+  const dir = tmpDir();
+  const { file, stderrTarget } = createLog(dir);
+  const fd = stderrTarget();
+  fs.writeSync(fd, "child crashed\n");
+  fs.closeSync(fd);
+  assert.match(fs.readFileSync(file, "utf8"), /child crashed/);
+
+  const blocked = path.join(tmpDir(), "a-file");
+  fs.writeFileSync(blocked, "");
+  const fallbackDir = tmpDir();
+  const fallbackFd = createLog(path.join(blocked, "analytics"), { fallbackDir }).stderrTarget();
+  fs.writeSync(fallbackFd, "child crashed early\n");
+  fs.closeSync(fallbackFd);
+  assert.match(fs.readFileSync(path.join(fallbackDir, "claude-analytics.log"), "utf8"), /child crashed early/);
+});
+
+test("with no writable log anywhere, a child process's stderr is ignored rather than failing", () => {
+  const blocked = path.join(tmpDir(), "a-file");
+  fs.writeFileSync(blocked, "");
+  const { stderrTarget } = createLog(path.join(blocked, "analytics"), { fallbackDir: path.join(blocked, "tmp") });
+  assert.equal(stderrTarget(), "ignore");
+});
