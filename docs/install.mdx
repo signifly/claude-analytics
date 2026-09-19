@@ -20,8 +20,9 @@ claude plugin install usage-analytics@claude-analytics
 
 To try it without installing, start Claude Code with `claude --plugin-dir plugins/usage-analytics` from a clone.
 
-When a new plugin version is published, or after you change the plugin locally, run
-`claude plugin marketplace update claude-analytics` and restart Claude Code.
+When a new plugin version is published, run `claude plugin marketplace update claude-analytics`, then
+`claude plugin update usage-analytics@claude-analytics`, and restart Claude Code. With `--plugin-dir`, a restart
+alone picks up local changes.
 
 ## For a team repo
 

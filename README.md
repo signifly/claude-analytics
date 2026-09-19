@@ -180,4 +180,5 @@ in-memory sink, the Loki adapter against an injected `fetch`. To ship a change, 
   limited to one per kind per hour.
 - Leftover `batch-*.jsonl` files mean Loki was unreachable or misconfigured; they are retried by the next flusher.
 - Nothing arriving and no log at all usually means `node` is not on the `PATH` that Claude Code hooks run with.
-- After changing the plugin, run `claude plugin marketplace update claude-analytics` and restart Claude Code.
+- After a new plugin version is published, run `claude plugin marketplace update claude-analytics`, then
+  `claude plugin update usage-analytics@claude-analytics`, and restart Claude Code.
