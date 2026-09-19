@@ -7,8 +7,8 @@ developer sessions and autonomous (Sandcastle) agents. This repo hosts both halv
 - **`docker-compose.yml` + `stack/`** – the LGTM stack (Loki, Grafana, Tempo, Mimir) plus an OTel collector,
   with a provisioned "Claude Code usage" dashboard.
 
-Documentation lives in [`docs/`](docs/index.mdx): start with [what it is](docs/index.mdx) and
-[install](docs/install.mdx).
+Documentation lives in [`docs/`](docs/): start with [what it is](docs/index.mdx), [install](docs/install.mdx)
+and [what is recorded](docs/what-is-recorded.mdx).
 
 ```
 Claude Code hooks ──append──▶ ~/.claude/analytics/events.jsonl ──flusher (1s batches)──▶ Loki ──▶ Grafana
@@ -180,4 +180,5 @@ in-memory sink, the Loki adapter against an injected `fetch`. To ship a change, 
   limited to one per kind per hour.
 - Leftover `batch-*.jsonl` files mean Loki was unreachable or misconfigured; they are retried by the next flusher.
 - Nothing arriving and no log at all usually means `node` is not on the `PATH` that Claude Code hooks run with.
-- After changing the plugin, run `claude plugin marketplace update claude-analytics` and restart Claude Code.
+- After a new plugin version is published, run `claude plugin marketplace update claude-analytics`, then
+  `claude plugin update usage-analytics@claude-analytics`, and restart Claude Code.

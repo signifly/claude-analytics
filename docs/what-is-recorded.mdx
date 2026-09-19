@@ -1,0 +1,65 @@
+---
+title: What is recorded
+description: The exact shape of a usage event, the kinds of event, and how they appear in Loki. Names are recorded; content never is.
+---
+
+# What is recorded
+
+Each hook event that matters becomes one **usage event**. The words in bold are defined in the
+[glossary](https://github.com/signifly/claude-analytics/blob/main/CONTEXT.md).
+
+## Never recorded
+
+Prompt text, command arguments, tool inputs, tool outputs, file contents and file paths. The working directory is
+read only to look up the project name and the git email for the identity tag; no path is kept. The project name
+is the `origin` remote's repo name, else the git root's folder name, else the working folder's name, else
+`unknown`.
+
+This is enforced in one place, as an allow-list applied when the event is built, and pinned by tests. The
+reasoning is in [ADR 0003](architecture-decisions/0003-record-names-never-content.mdx).
+
+## The fields of an event
+
+| Field | What it holds |
+|---|---|
+| `ts`, `sub` | Timestamp: milliseconds, plus random sub-millisecond digits that make collisions practically impossible and stay the same across retries |
+| `kind` | The **kind**: one of the values in the table below |
+| `name` | The **name** of what was used |
+| `mcp_server` | For `mcp` events, the server part of the tool name |
+| `subagent` | When the event fired inside a subagent, that subagent's type |
+| `user` | The **identity tag** |
+| `project` | The project name, as above, or `CLAUDE_ANALYTICS_PROJECT` |
+| `source` | The **source** |
+| `session_id` | Claude Code's session id; `unknown` if it is not a bare identifier, left out if the hook sent none |
+
+Every name is reduced to a bare identifier before it is stored (see **Name** in the glossary), so free text can
+never ride along. A skill invoked with a malformed name is recorded as `unknown`.
+
+## Kinds of event
+
+| `kind` | From | `name` |
+|---|---|---|
+| `skill` | `PostToolUse` on the `Skill` tool | skill name |
+| `command` | `UserPromptSubmit` starting with `/word` | command name (arguments are not recorded) |
+| `agent` | `PostToolUse` on `Agent`/`Task` | subagent type |
+| `mcp` | `PostToolUse` on `mcp__*` | full tool name |
+| `tool` | any other `PostToolUse` | tool name |
+| `prompt` | any other `UserPromptSubmit` | constant `prompt` (prompt text is never recorded) |
+| `session` | `SessionStart` | startup / resume / clear / compact |
+
+How a skill typed as a slash command is counted is part of **Kind** in the glossary.
+
+## In Loki
+
+- **Stream labels** are chosen to be low-cardinality: `service_name` (always `claude-code-usage`), `user`, `project`,
+  `source` and `kind`.
+- **The log line** is the event as JSON, without `ts` and `sub`: `kind`, `name`, `user`, `project`, `source`,
+  and where present `session_id`, `subagent` and `mcp_server`.
+- **The entry's timestamp** is `ts` in nanoseconds, with `sub` as the sub-millisecond digits. A retried push sends
+  the same timestamp and line, which Loki treats as a duplicate.
+
+Skill runs per person over the last week:
+
+```logql
+sum by (name, user) (count_over_time({service_name="claude-code-usage", kind="skill"} | json name="name" [7d]))
+```

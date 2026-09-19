@@ -10,8 +10,8 @@ skills, slash commands, tools, MCP tools and subagents that run in developer ses
 (Sandcastle) agents, and shows them on a Grafana dashboard.
 
 It records **names, never content**. Prompt text, command arguments, tool inputs and outputs, file contents and
-file paths never leave the machine. [ADR 0003](architecture-decisions/0003-record-names-never-content.mdx) explains
-why.
+file paths never leave the machine; the project is identified by the repo or folder *name*, never its path.
+[What is recorded](what-is-recorded.mdx) shows the exact event shape.
 
 ## The two halves
 
@@ -29,6 +29,7 @@ Claude Code hooks ──append──▶ ~/.claude/analytics/events.jsonl ──f
 ## Where to go next
 
 - [Install](install.mdx): add the plugin for yourself, a team repo, or an agent, and configure it.
+- [What is recorded](what-is-recorded.mdx): the fields of a usage event, its kinds, and how it looks in Loki.
 - [Architecture decisions](architecture-decisions/0001-hooks-and-local-buffer-over-native-telemetry.mdx): why it was
   built this way.
 
