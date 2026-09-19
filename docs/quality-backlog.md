@@ -5,61 +5,67 @@ current phase. One item = one PR, branched as `quality/<slug>`.
 
 Audit 1: 2026-09-19, against main at 9584787. Main green: 143 pass, 1 skipped (smoke, needs Loki).
 
-**Coordination:** Emil's PR #3 (`fix-held-name-nesting`) touches `event-buffer.mjs` and the flusher's idle logic.
+**Coordination:** Emil's PR #3 (`fix-held-name-nesting`) touches `event-buffer.mjs` and its tests.
 Items marked *(after #3)* wait until it has merged; skip past them to the next item until then.
 
 ## Phase 1: code quality
 
 - [ ] **Session cache retention belongs to session-context.** `flush.mjs` defines `SESSION_CACHE_MS` and passes it
   to `pruneSessions(dir, maxAgeMs, log)`, so the entry point knows how long the cache of another module lives, and
-  `pruneSessions` has no test at all. Give `pruneSessions` its own default (keep the parameter for tests), test
+  `pruneSessions` has no test at all. Change it to `pruneSessions(dir, { maxAgeMs = <default>, log } = {})`, test
   it at the interface (old entries go, fresh ones stay, a missing `sessions/` is silent, other errors are logged).
   _Done when:_ `flush.mjs` calls `pruneSessions(dir, { log })` with no age, and `test/session-context.test.mjs`
   covers pruning.
 - [ ] **The fallback log location has one owner.** `record-main.mjs` rebuilds `$TMPDIR/claude-analytics.log` to
   point the flusher's stderr at it, duplicating the fallback rule inside `log.mjs`. Have `createLog` expose the
   fallback path (or a `stderrTarget()` that opens the first writable of the two) and use it in `startFlusher`.
-  _Done when:_ the string `claude-analytics.log` appears only in `log.mjs`, with a test in `test/log.test.mjs`.
+  _Done when:_ among `plugins/usage-analytics/scripts/`, the string `claude-analytics.log` appears only in
+  `log.mjs`, and `test/log.test.mjs` covers the new interface.
 - [ ] **One question for "should this hook start a flusher?".** `record-main.mjs` must know to call
   `isHeld(dir)` before `spawnAllowed(dir)` (the other order touches the throttle marker for nothing). Add
   `mayStartFlusher(dir)` to `flusher-lock.mjs` that owns the order; keep `isHeld`/`spawnAllowed` exported for
   their existing tests. _Done when:_ `record-main.mjs` makes one lock call and a test pins that a held lock does
   not touch the throttle marker.
-- [ ] **A lock whose heartbeat cannot be read is not a free lock.** `heldBy` in `flusher-lock.mjs` treats any
-  `statSync` failure as "not held", while `readPid` deliberately treats unreadable as "leave it alone". Make a
-  non-ENOENT stat failure throw `Unreadable` like `readPid`. _Done when:_ a test with an injected stat failure
-  (or equivalent seam) shows `acquire` returns null and logs "cannot read lock", and existing lock tests pass.
 - [ ] **Glossary covers the terms the code uses.** `CONTEXT.md` has no entry for *backlog* (used in
   `maxBacklogBytes` and the "backlog over N bytes" log line, and covering both the live file cap and held
-  batches), *data dir*, *claim*, *grace period*, or *push* / *chunk*. Add them, glossary-only, no
-  implementation detail. _Done when:_ every domain term in log lines and option names is either in `CONTEXT.md`
-  or is plainly not domain language.
+  batches), *data dir*, *claim*, *grace period*, or *push*. Add them, glossary-only, no implementation detail.
+  _Done when:_ `CONTEXT.md` has entries for backlog, data dir, claim, grace period and push.
 - [ ] **drain test imports its collaborators like every other test.** `test/drain.test.mjs`'s last-but-one test
   dynamically imports `event-buffer`, `fs`, `os`, `path` inside the test body. Move them to top-level imports.
-  _Done when:_ no `await import(` in `test/`, all tests green. *(after #3, it touches drain tests)*
+  _Done when:_ no `await import(` in `test/`, all tests green.
 - [ ] **Buffer file names are built in one place.** `event-buffer.mjs` spells batch, held, late, settled and tmp
   names with ad-hoc template strings and regexes spread over `claim`, `retire`, `sweepSettled` and `settle`
   (the `origin` regex). Collect them into one small internal naming helper so the age-order invariant in ADR 0002
-  is visible in one place. No interface change. _Done when:_ every buffer file name is produced and parsed by the
-  helper and `test/event-buffer.test.mjs` plus ten loaded runs of `test/multi-process.test.mjs` pass unchanged.
+  is visible in one place. No interface change. _Done when:_ the batch, `-held-`, `-late-`, `.settled-` and batch
+  `.tmp` names in the data dir (not `dead/`, not the live file) are produced and parsed by the helper, and `test/event-buffer.test.mjs` plus ten loaded runs of `test/multi-process.test.mjs` pass unchanged.
   *(after #3, which changes held naming)*
 
 ## Phase 2: documentation content
 
-- [ ] Restructure `docs/` as MDX pages: what it is, install, what is recorded, how it works, operating the stack,
-  decisions. Split into several PRs (one or two pages each) when a PR would get large.
+- [ ] Docs pages "what it is" and "install" (plugin, per-repo settings, Sandcastle). _Done when:_ both MDX pages
+  exist under `docs/` with frontmatter and README links to them.
+- [ ] Docs page "what is recorded" (event shape, kinds, labels, the names-only rule). _Done when:_ the page exists,
+  links ADR 0003 and `CONTEXT.md`, and repeats no glossary definitions.
+- [ ] Docs page "how it works" (hooks, buffer, flusher, failures, late writes, modules). _Done when:_ the page
+  exists and every module in the README Modules table is covered.
+- [ ] Docs page "operating the stack" (ports, auth, retention, dashboard, troubleshooting, native telemetry).
+  _Done when:_ the page exists and covers every README section on these topics.
 - [ ] Shrink `README.md` to an entry point that links into `docs/`; keep `CONTEXT.md` as the glossary.
+  _Done when:_ README is under ~60 lines and every section it dropped lives in a docs page.
 - [ ] ADR (via /architect:adr): the flusher is spawned on demand by hooks and exits when idle, rather than a
-  daemon (launchd/systemd) or a flusher per session.
-- [ ] ADR (via /architect:adr): retries rely on Loki deduplicating identical (timestamp, line) pairs, which is
-  why events carry `sub` and why "pushed twice" is acceptable everywhere.
+  daemon (launchd/systemd) or a flusher per session. _Done when:_ the ADR is in `docs/architecture-decisions/`.
+- [ ] ADR (via /architect:adr): why events carry `sub` (retry-stable nanosecond timestamps). ADR 0002 already
+  relies on Loki deduplicating re-pushes; this one records the timestamp scheme that makes that true and
+  references 0002 rather than re-deciding it.
 
 ## Phase 3: Turborepo
 
 - [ ] pnpm workspaces: root `pnpm-workspace.yaml` with `plugins/*`, plugin `package.json` (zero deps, no build),
   lockfile; `pnpm test` / `pnpm check` work; CI still on npm scripts. ADR for the move.
+  _Done when:_ `pnpm install && pnpm test && pnpm check` pass from a clean clone and the ADR is merged.
 - [ ] turbo: `turbo.json` with `test`, `check`, `build`; root scripts delegate to turbo.
-- [ ] CI runs through turbo.
+  _Done when:_ `pnpm turbo run test check build` passes locally with the plugin's tasks included.
+- [ ] CI runs through turbo. _Done when:_ every CI job invokes turbo and is green on the PR.
 
 ## Phase 4: docs app
 
@@ -68,7 +74,10 @@ Items marked *(after #3)* wait until it has merged; skip past them to the next i
 
 ## Questions for Emil
 
-_None yet._
+- **Should an unreadable lock heartbeat count as held?** `heldBy` in `flusher-lock.mjs` treats any `statSync`
+  failure as "not held", while `readPid` treats an unreadable lock as "leave it alone". Aligning them would make
+  `isHeld` return true and `acquire` return null on a non-ENOENT stat failure: a lock-semantics change, not a
+  refactor, and it needs a stat seam that does not exist yet. Moved out of phase 1 for that reason.
 
 ## Parked
 
