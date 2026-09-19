@@ -10,8 +10,8 @@ Items marked *(after #3)* wait until it has merged; skip past them to the next i
 does not block the next phase, but the "how it works" docs page is gated on #3 too, since it describes held naming.
 
 **Loaded run** (required for changes to event-buffer, drain, flush or flusher-lock):
-`pids=; for i in 1 2 3 4; do (while :; do :; done) & pids="$pids $!"; done; ok=0; for i in $(seq 10); do node --test test/multi-process.test.mjs && ok=$((ok+1)); done; kill $pids; echo "$ok/10"`
-prints `10/10`.
+`bash -c 'pids=; for i in 1 2 3 4; do (while :; do :; done) & pids="$pids $!"; done; ok=0; for i in $(seq 10); do node --test test/multi-process.test.mjs && ok=$((ok+1)); done; kill $pids; echo "$ok/10"'`
+prints `10/10` and leaves no busy loops behind (keep the `bash -c`: zsh does not word-split `$pids`).
 
 ## Phase 1: code quality
 
@@ -19,7 +19,7 @@ prints `10/10`.
   to `pruneSessions(dir, maxAgeMs, log)`, so the entry point knows how long the cache of another module lives, and
   `pruneSessions` has no test at all. Change it to `pruneSessions(dir, { maxAgeMs = <default>, log } = {})`, test
   it at the interface (old entries go, fresh ones stay, a missing `sessions/` is silent, other errors are logged).
-  _Done when:_ `flush.mjs` calls `pruneSessions(dir, { log })` with no age, and `test/session-context.test.mjs`
+  _Done when:_ `flush.mjs` calls `pruneSessions(dir, { log })` with no age, the default is still 6 days, and `test/session-context.test.mjs`
   covers pruning.
 - [ ] **The fallback log location has one owner.** `record-main.mjs` rebuilds `$TMPDIR/claude-analytics.log` to
   point the flusher's stderr at it, duplicating the fallback rule inside `log.mjs`. Have `createLog` expose the
@@ -42,8 +42,10 @@ prints `10/10`.
   names with ad-hoc template strings and regexes spread over `claim`, `retire`, `sweepSettled` and `settle`
   (the `origin` regex). Collect them into one small internal naming helper so the age-order invariant in ADR 0002
   is visible in one place. No interface change. _Done when:_ the batch, `-held-`, `-late-`, `.settled-` and batch
-  `.tmp` names in the data dir (not `dead/`, not the live file) are produced and parsed by the helper, and `test/event-buffer.test.mjs` pass unchanged, a new table test pins that each helper-produced name is byte-identical to the
-  pre-refactor format and that pre-refactor names parse, and the loaded run passes.
+  `.tmp` names in the data dir (not `dead/`, not the live file) are produced and parsed by the helper; the
+  existing tests in `test/event-buffer.test.mjs` pass without modification; a new table test pins that each
+  helper-produced name is byte-identical to the pre-refactor format and that pre-refactor names parse; and the
+  loaded run passes.
   *(after #3, which changes held naming)*
 
 ## Phase 2: documentation content
