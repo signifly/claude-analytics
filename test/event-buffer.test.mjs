@@ -349,3 +349,58 @@ test("leftover temp files from an interrupted settle are cleaned up", () => {
   open(dir).claim();
   assert.deepEqual(fs.readdirSync(dir), []);
 });
+
+test("a batch can be partly settled any number of times: its file name stays bounded and nothing is lost", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  const all = Array.from({ length: 40 }, (_, i) => `e${i}`);
+  for (const n of all) buffer.append(event(n));
+  const seen = [];
+  for (let pass = 0; pass < 40; pass++) {
+    const [batch] = buffer.claim();
+    seen.push(batch.events[0].name);
+    assert.ok(batch.name.length < 100, `pass ${pass}: ${batch.name.length}-character batch name`);
+    batch.settle({ handled: 1 }); // a flapping sink: one push gets through per pass
+  }
+  assert.deepEqual(seen, all);
+  assert.deepEqual(buffer.claim(), []);
+});
+
+test("several late writes to one settled batch are offered in the order they were written", () => {
+  const dir = tmpDir();
+  const buffer = open(dir);
+  buffer.append(event("claimed-" + "x".repeat(20))); // keeps the byte offset under 100 for the first late write…
+  const [batch] = buffer.claim();
+  const slowWriter = fs.openSync(batchFiles(dir)[0], "a");
+  batch.settle();
+  fs.writeSync(slowWriter, JSON.stringify(event("late-1")) + "\n");
+  assert.deepEqual(names(buffer.claim()), ["late-1"]); // left unsettled
+  fs.writeSync(slowWriter, JSON.stringify(event("late-2")) + "\n"); // …and over 100 for the second
+  fs.closeSync(slowWriter);
+  assert.deepEqual(names(buffer.claim()), ["late-1", "late-2"]);
+});
+
+test("a late write that cannot be recovered does not count as pending forever", { skip: process.getuid?.() === 0 && "root ignores permissions" }, () => {
+  const dir = tmpDir();
+  const lines = [];
+  const buffer = open(dir, { log: (l) => lines.push(l) });
+  buffer.append(event("claimed"));
+  const [batch] = buffer.claim();
+  const slowWriter = fs.openSync(batchFiles(dir)[0], "a");
+  batch.settle();
+  fs.writeSync(slowWriter, JSON.stringify(event("late")) + "\n");
+  fs.closeSync(slowWriter);
+  const settled = path.join(dir, fs.readdirSync(dir).find((f) => f.includes(".settled-")));
+  fs.chmodSync(dir, 0o555); // the data dir went read-only: the late bytes cannot be turned into a batch
+  try {
+    assert.equal(buffer.pending(), true);
+    assert.deepEqual(buffer.claim(), []);
+    const aMinuteAgo = new Date(Date.now() - 60_000);
+    fs.utimesSync(settled, aMinuteAgo, aMinuteAgo);
+    assert.equal(buffer.pending(), false); // given up on for now: the flusher may go idle
+    assert.match(lines.join("\n"), /cannot sweep/);
+  } finally {
+    fs.chmodSync(dir, 0o755);
+  }
+  assert.deepEqual(names(buffer.claim()), ["late"]); // …but still delivered once the dir is writable again
+});

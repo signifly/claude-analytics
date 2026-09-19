@@ -123,12 +123,18 @@ export function openBuffer(dir, options = {}) {
   // so no failure in between can lose the held events: the worst case is both
   // files existing, and re-pushed events are deduplicated by the sink.
   function retire(file, bytesSeen, held) {
-    const base = file.replace(/\.jsonl$/, "");
-    const id = `${process.pid}-${retired++}`;
+    // One "-held-" segment per lineage, however often it is partly settled:
+    // names that grew with every pass would end in ENAMETOOLONG and a wedged buffer.
+    const base = file.replace(/\.jsonl$/, "").replace(/-held-\d+-\d+$/, "");
+    let id, heldFile;
+    do {
+      id = `${process.pid}-${retired++}`;
+      heldFile = `${base}-held-${id}.jsonl`;
+    } while (fs.existsSync(heldFile)); // never the parent itself, nor anything else already there
     if (held.length) {
       const tmp = `${file}.tmp`;
       fs.writeFileSync(tmp, held);
-      fs.renameSync(tmp, `${base}-held-${id}.jsonl`);
+      fs.renameSync(tmp, heldFile);
     }
     fs.renameSync(file, `${file}.settled-${bytesSeen}-${id}`);
   }
@@ -145,7 +151,7 @@ export function openBuffer(dir, options = {}) {
           // A late write: those bytes become a batch of their own ("-late" sorts
           // after the parent's "-held" rest and before any newer batch), and we keep watching.
           const late = fs.readFileSync(file).subarray(Number(seen));
-          fs.writeFileSync(path.join(dir, `${batchName.replace(/\.jsonl$/, "")}-late-${id}-${seen}.jsonl`), late);
+          fs.writeFileSync(path.join(dir, `${batchName.replace(/\.jsonl$/, "")}-late-${id}-${seen.padStart(12, "0")}.jsonl`), late); // padded: name order is write order
           fs.renameSync(file, path.join(dir, `${batchName}.settled-${Number(seen) + late.length}-${id}`));
           // Deliberately the wall clock, not the injected now(): it is compared with a real file mtime.
         } else if (Date.now() - info.mtimeMs >= settleGraceMs) fs.rmSync(file, { force: true });
@@ -225,7 +231,12 @@ export function openBuffer(dir, options = {}) {
     },
 
     // Unclaimed events: in the live file, or written late into a settled batch.
-    pending: () => size(liveFile) > 0 || list(dir, SETTLED).some((file) => lateBytes(file) > 0),
+    // A late write is swept by the next claim; one that is still there well past
+    // the grace period is a sweep that keeps failing (logged), and must not keep
+    // the flusher alive. claim() goes on trying it regardless.
+    pending: () =>
+      size(liveFile) > 0 ||
+      list(dir, SETTLED).some((file) => lateBytes(file) > 0 && Date.now() - mtime(file) < 3 * settleGraceMs),
 
     // Claims the live file by renaming it (writers reopen the path per event,
     // so new events land in a fresh file) and returns every held batch, oldest first.
