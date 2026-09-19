@@ -7,6 +7,7 @@ developer sessions and autonomous (Sandcastle) agents. It records names, never c
   buffer; a background flusher ships the buffer to Loki.
 - **`docker-compose.yml` and `stack/`** run Loki, Grafana, Tempo, Mimir and an OpenTelemetry collector, with a
   provisioned "Claude Code usage" dashboard.
+- **`apps/docs/`** is the documentation site, built with Fumadocs from `docs/` (Node 20.9+ for `pnpm build`).
 
 ```
 Claude Code hooks ──append──▶ ~/.claude/analytics/events.jsonl ──flusher (1s batches)──▶ Loki ──▶ Grafana

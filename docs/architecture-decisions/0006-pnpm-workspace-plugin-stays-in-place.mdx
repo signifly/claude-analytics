@@ -47,7 +47,8 @@ runtime.
 
 - A docs app, or any later tool, can join the repo with its own dependencies without touching the plugin.
 - Existing installs and the marketplace keep working: the plugin's path, manifest and runtime code are unchanged.
-- One command set for local work and CI, both running through turbo.
+- One command set for local work and CI, both running through turbo. The docs app, since added in `apps/docs`,
+  builds only on Node 20.9 or newer (Next.js requires it), so CI's Node 18 job checks and tests but does not build.
 
 ### Negative Consequences
 
