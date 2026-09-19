@@ -66,7 +66,7 @@ prints `10/10` and leaves no busy loops behind, even if interrupted (keep the `b
 - [x] Docs page "operating the stack" (ports, auth, retention, dashboard, troubleshooting, native telemetry).
   _Done when:_ the page exists, covers every README section on these topics, and `docs/index.mdx` and
   `docs/install.mdx` link to it instead of the README's "Run the stack" section.
-- [ ] Shrink `README.md` to an entry point that links into `docs/`; keep `CONTEXT.md` as the glossary.
+- [x] Shrink `README.md` to an entry point that links into `docs/`; keep `CONTEXT.md` as the glossary.
   _Done when:_ README is at most 60 lines and every section it dropped lives in a docs page.
 - [ ] ADR (via /architect:adr): the flusher is spawned on demand by hooks and exits when idle, rather than a
   daemon (launchd/systemd) or a flusher per session. _Done when:_ the ADR is in `docs/architecture-decisions/`.
