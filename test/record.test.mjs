@@ -11,12 +11,17 @@ const record = fileURLToPath(new URL("../plugins/usage-analytics/scripts/record.
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "record-"));
 const payload = (over = {}) => JSON.stringify({ hook_event_name: "PostToolUse", session_id: "s-1", cwd: os.tmpdir(), tool_name: "Read", tool_input: {}, ...over });
 
+// Every hook gets its own TMPDIR: the temp dir is where the log, its throttle
+// markers and (with no home) the whole buffer fall back to, and the machine's
+// real one may hold a live buffer. The result says which dir was used.
 function runHook(input, env = {}) {
-  return spawnSync(process.execPath, [record], {
+  const tmp = env.TMPDIR ?? tmpDir();
+  const result = spawnSync(process.execPath, [record], {
     input,
     env: {
       PATH: process.env.PATH,
       HOME: process.env.HOME,
+      TMPDIR: tmp,
       CLAUDE_ANALYTICS_LOKI_URL: "http://127.0.0.1:9", // nothing listens: the flusher fails fast and exits
       CLAUDE_ANALYTICS_IDLE_EXIT_MS: "300",
       CLAUDE_ANALYTICS_FLUSH_MS: "100",
@@ -24,6 +29,7 @@ function runHook(input, env = {}) {
       ...env,
     },
   });
+  return { ...result, tmp };
 }
 const silent = (result) => {
   assert.equal(result.status, 0);
@@ -89,4 +95,21 @@ test("an unreadable data dir leaves one line per kind of problem, not one per ho
   const log = fs.readFileSync(path.join(fallback, "claude-analytics.log"), "utf8");
   assert.equal(log.split("\n").filter((l) => l.includes("cannot stat")).length, 1, log);
   assert.match(log, /record failed/);
+});
+
+test("with no home, the buffer and the log land in the temp dir the hook was given, never the machine's own", () => {
+  const result = runHook(payload(), { HOME: "", CLAUDE_ANALYTICS_DIR: "" });
+  silent(result);
+  assert.ok(result.tmp, "runHook must give every hook its own TMPDIR");
+  const fallbackDir = path.join(result.tmp, "claude-analytics");
+  const held = fs.readdirSync(fallbackDir).filter((f) => f === "events.jsonl" || f.startsWith("batch-"));
+  assert.equal(held.length, 1);
+  assert.match(fs.readFileSync(path.join(fallbackDir, held[0]), "utf8"), /"user":"test"/);
+});
+
+test("with a data dir that cannot be created, the fallback log lands in the temp dir the hook was given", () => {
+  const result = runHook(payload(), { CLAUDE_ANALYTICS_DIR: blockedParent() });
+  silent(result);
+  assert.ok(result.tmp, "runHook must give every hook its own TMPDIR");
+  assert.match(fs.readFileSync(path.join(result.tmp, "claude-analytics.log"), "utf8"), /record failed/);
 });
