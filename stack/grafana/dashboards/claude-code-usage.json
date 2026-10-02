@@ -22,7 +22,8 @@
         "query": "loki",
         "current": {},
         "refresh": 1,
-        "hide": 0
+        "hide": 0,
+        "regex": "/^(?!grafanacloud-.*-(alert-state-history|usage-insights)$).*/"
       },
       {
         "name": "user",

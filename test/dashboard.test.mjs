@@ -15,3 +15,13 @@ test("the dashboard picks its Loki through a variable, so it imports into a Graf
   assert.ok(uids.length > 0);
   assert.deepEqual(new Set(uids), new Set(["${datasource}"]));
 });
+
+test("the Loki picker leaves out Grafana Cloud's internal Loki data sources", () => {
+  const { regex } = dashboard.templating.list[0];
+  const [, body, flags] = regex.match(/^\/(.*)\/(\w*)$/);
+  const offered = (name) => new RegExp(body, flags).test(name);
+  assert.ok(offered("Loki"));
+  assert.ok(offered("grafanacloud-signifly-logs"));
+  assert.ok(!offered("grafanacloud-signifly-alert-state-history"));
+  assert.ok(!offered("grafanacloud-signifly-usage-insights"));
+});

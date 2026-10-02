@@ -47,7 +47,8 @@ For a team, send events to the company's Grafana Cloud stack instead of exposing
 3. Under the stack's Loki settings, add a stream retention rule of 90 days (`2160h`) for
    `{service_name="claude-code-usage"}`. The default is 30 days.
 4. In the stack's Grafana, go to **Dashboards → New → Import** and upload
-   `stack/grafana/dashboards/claude-code-usage.json`. Pick the stack's logs data source in the **Loki** variable.
+   `stack/grafana/dashboards/claude-code-usage.json`. In the **Loki** variable, pick `grafanacloud-<stack>-logs`
+   and save the dashboard.
 5. Decide who may read the data. Anyone who can query the logs data source can see each person's usage (see
    [Install](./install.mdx#configuration) about the identity tag).
 
@@ -62,6 +63,10 @@ repository's `.claude/settings.json`):
   }
 }
 ```
+
+Then restart every open Claude Code session and stop the running flusher with
+`pkill -f usage-analytics/scripts/flush.mjs`. A flusher keeps the URL it started with, and it stays alive while
+events keep arriving. Held events are not lost: the next flusher sends them.
 
 The URL may also be the full push URL (`.../loki/api/v1/push`). To check a machine, run any slash command in
 Claude Code, then query `{service_name="claude-code-usage"}` in the stack's Explore. If nothing arrives, a
