@@ -16,12 +16,21 @@
   "templating": {
     "list": [
       {
+        "name": "datasource",
+        "label": "Loki",
+        "type": "datasource",
+        "query": "loki",
+        "current": {},
+        "refresh": 1,
+        "hide": 0
+      },
+      {
         "name": "user",
         "label": "User / agent",
         "type": "query",
         "datasource": {
           "type": "loki",
-          "uid": "loki"
+          "uid": "${datasource}"
         },
         "refresh": 2,
         "multi": true,
@@ -43,7 +52,7 @@
         "type": "query",
         "datasource": {
           "type": "loki",
-          "uid": "loki"
+          "uid": "${datasource}"
         },
         "refresh": 2,
         "multi": true,
@@ -65,7 +74,7 @@
         "type": "query",
         "datasource": {
           "type": "loki",
-          "uid": "loki"
+          "uid": "${datasource}"
         },
         "refresh": 2,
         "multi": true,
@@ -90,7 +99,7 @@
       "title": "Events",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 0,
@@ -102,7 +111,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sum(count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\"}[$__range]))",
@@ -140,7 +149,7 @@
       "title": "Skill runs",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 5,
@@ -152,7 +161,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sum(count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\", kind=\"skill\"}[$__range]))",
@@ -190,7 +199,7 @@
       "title": "Slash commands",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 10,
@@ -202,7 +211,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sum(count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\", kind=\"command\"}[$__range]))",
@@ -240,7 +249,7 @@
       "title": "Active users",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 15,
@@ -252,7 +261,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "count(sum by (user) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\"}[$__range])))",
@@ -290,7 +299,7 @@
       "title": "Sessions",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 20,
@@ -302,7 +311,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "count(sum by (session_id) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\"} | json session_id=\"session_id\" [$__range])))",
@@ -340,7 +349,7 @@
       "title": "Events over time by kind",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 0,
@@ -352,7 +361,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sum by (kind) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\"}[$__interval]))",
@@ -392,7 +401,7 @@
       "title": "Skill & command runs over time",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 12,
@@ -404,7 +413,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sum by (name) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\", kind=~\"skill|command\"} | json name=\"name\" [$__interval]))",
@@ -444,7 +453,7 @@
       "title": "Top skills",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 0,
@@ -456,7 +465,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sort_desc(topk(15, sum by (name) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\", kind=\"skill\"} | json name=\"name\" [$__range]))))",
@@ -501,7 +510,7 @@
       "title": "Top slash commands",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 8,
@@ -513,7 +522,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sort_desc(topk(15, sum by (name) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\", kind=\"command\"} | json name=\"name\" [$__range]))))",
@@ -558,7 +567,7 @@
       "title": "Activity by user",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 16,
@@ -570,7 +579,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sort_desc(sum by (user) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\"}[$__range])))",
@@ -615,7 +624,7 @@
       "title": "Skills & commands by user",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 0,
@@ -627,7 +636,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sum by (kind, name, user) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\", kind=~\"skill|command\"} | json name=\"name\" [$__range]))",
@@ -680,7 +689,7 @@
       "title": "Top tools",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 12,
@@ -692,7 +701,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sort_desc(topk(12, sum by (name) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\", kind=\"tool\"} | json name=\"name\" [$__range]))))",
@@ -737,7 +746,7 @@
       "title": "Subagents & MCP tools",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 18,
@@ -749,7 +758,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sort_desc(topk(12, sum by (name) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\", kind=~\"agent|mcp\"} | json name=\"name\" [$__range]))))",
@@ -794,7 +803,7 @@
       "title": "Activity by project",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 0,
@@ -806,7 +815,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sort_desc(sum by (project) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\"}[$__range])))",
@@ -851,7 +860,7 @@
       "title": "Dev sessions vs. Sandcastle agents",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 12,
@@ -863,7 +872,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "sum by (source) (count_over_time({service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\"}[$__range]))",
@@ -908,7 +917,7 @@
       "title": "Recent events",
       "datasource": {
         "type": "loki",
-        "uid": "loki"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "x": 0,
@@ -920,7 +929,7 @@
         {
           "datasource": {
             "type": "loki",
-            "uid": "loki"
+            "uid": "${datasource}"
           },
           "refId": "A",
           "expr": "{service_name=\"claude-code-usage\", user=~\"$user\", project=~\"$project\", source=~\"$source\"} | json | line_format \"{{.user}}  {{.kind}}  {{.name}}  ({{.project}})\"",

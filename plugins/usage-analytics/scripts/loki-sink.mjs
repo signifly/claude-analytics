@@ -10,7 +10,8 @@ const REJECTED = new Set([400, 413, 422]);
 const MISCONFIGURED = new Set([401, 403, 404, 407]);
 
 export function createLokiSink({ url, token, basicAuth, tenant, fetch = globalThis.fetch, log = () => {} }) {
-  const endpoint = `${String(url).replace(/\/+$/, "")}/loki/api/v1/push`;
+  // Accepts the base URL or the full push URL (Grafana Cloud shows the latter).
+  const endpoint = `${String(url).replace(/\/+$/, "").replace(/\/loki\/api\/v1\/push$/, "")}/loki/api/v1/push`;
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
   else if (basicAuth) headers.Authorization = `Basic ${Buffer.from(basicAuth).toString("base64")}`;
