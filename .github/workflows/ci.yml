@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Read-only, whatever the repository default: this workflow runs fork PRs.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ${{ matrix.os }}
@@ -17,9 +21,9 @@ jobs:
           - os: macos-latest
             node: 22
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v6 # version comes from packageManager in package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0; version comes from packageManager in package.json
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
@@ -32,14 +36,14 @@ jobs:
   stack:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
       - name: Manifests are valid JSON
         run: |
           for f in .claude-plugin/marketplace.json plugins/usage-analytics/.claude-plugin/plugin.json \
-                   plugins/usage-analytics/hooks/hooks.json examples/project-settings.json \
+                   plugins/usage-analytics/hooks/hooks.json examples/project-settings.json examples/managed-settings.json \
                    stack/grafana/dashboards/*.json; do
             node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$f" || exit 1
           done

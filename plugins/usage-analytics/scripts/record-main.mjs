@@ -21,6 +21,7 @@ function startFlusher(stderr, log) {
 }
 
 function main() {
+  process.umask(0o077); // the buffer, log and session cache are the user's alone
   const config = loadConfig();
   if (config.disabled) return;
   const dir = config.dataDir;
@@ -32,7 +33,8 @@ function main() {
     try {
       payload = JSON.parse(fs.readFileSync(0, "utf8"));
     } catch (err) {
-      return logOnce("stdin", `unreadable hook payload: ${describe(err)}`);
+      // A JSON syntax error quotes the start of the input, which may be a prompt.
+      return logOnce("stdin", `unreadable hook payload: ${err instanceof SyntaxError ? "not JSON" : describe(err)}`);
     }
     if (!payload || typeof payload !== "object") return logOnce("stdin", "hook payload is not an object");
 

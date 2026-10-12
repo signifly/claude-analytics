@@ -2,3 +2,8 @@
 packages:
   - "plugins/*"
   - "apps/*"
+
+# Patched versions of the docs site's transitive dependencies, until next and tailwind require them.
+overrides:
+  sharp: ">=0.35.5"
+  source-map-js: ">=1.2.2"

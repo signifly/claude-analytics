@@ -46,12 +46,9 @@ export function sessionContext({ dir, sessionId, cwd, config, logOnce = () => {}
       return process.env.USER || process.env.USERNAME || ""; // uid without a passwd entry (containers)
     }
   };
-  // Last path segment of the origin URL (any credentials sit before it and are never kept),
-  // else the repo folder, else the working folder.
-  const project = () => {
-    const fromRemote = git("remote", "get-url", "origin").match(/([^/:]+?)(?:\.git)?\/?$/)?.[1];
-    return fromRemote || path.basename(git("rev-parse", "--show-toplevel") || cwd || "") || "unknown";
-  };
+  // The repo name from the origin URL, else the repo folder, else the working folder.
+  const project = () =>
+    repoName(git("remote", "get-url", "origin")) || path.basename(git("rev-parse", "--show-toplevel") || cwd || "") || "unknown";
 
   const context = {
     user: config.user || git("config", "user.email") || osUser() || "unknown",
@@ -69,6 +66,24 @@ export function sessionContext({ dir, sessionId, cwd, config, logOnce = () => {}
     }
   }
   return context;
+}
+
+// The last path segment of a remote URL, without .git. Only the path is read, so
+// credentials (user:token@), query strings (?private_token=) and fragments never
+// reach it; and a segment that is not a plain name yields "" rather than a guess.
+export function repoName(remote) {
+  let pathPart = String(remote).replace(/[?#].*$/, "");
+  if (/^[a-z][\w+.-]*:\/\//i.test(pathPart)) {
+    try {
+      pathPart = new URL(pathPart).pathname;
+    } catch {
+      return "";
+    }
+  } else {
+    pathPart = pathPart.replace(/^[^/]*?:/, ""); // scp-like user@host:path
+  }
+  const name = pathPart.replace(/\/+$/, "").split("/").pop().replace(/\.git$/, "");
+  return /^[\w.-]{1,100}$/.test(name) ? name : "";
 }
 
 // Removes cached session contexts untouched for longer than maxAgeMs.

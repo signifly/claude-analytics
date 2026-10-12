@@ -45,11 +45,27 @@ into the repo's `.claude/settings.json`. The plugin is enabled for everyone once
 }
 ```
 
-To make it mandatory across an organisation, put the same keys in managed settings.
-
 Keep Loki credentials out of this file: it is committed, often to a client's repository. Set
 `CLAUDE_ANALYTICS_LOKI_URL` and the credentials in managed settings or in each person's `~/.claude/settings.json`
 instead. For the company Grafana Cloud stack, see [On Grafana Cloud](./operating-the-stack.mdx#on-grafana-cloud).
+
+## For an organisation
+
+Managed settings install the plugin on every machine and keep it on. Start from
+[`examples/managed-settings.json`](https://github.com/signifly/claude-analytics/blob/main/examples/managed-settings.json)
+and fill in the Loki URL and credentials. Deliver it in one of these ways:
+
+- an MDM profile (Iru/Kandji, Jamf) for the `com.anthropic.claudecode` preference domain, with the same keys;
+- `/Library/Application Support/ClaudeCode/managed-settings.json` on macOS;
+- the claude.ai admin console. This only reaches people signed in to Claude Code with your Team or Enterprise
+  organisation, not personal Pro or Max plans.
+
+Keep every `CLAUDE_ANALYTICS_*` variable in the policy, empty when it should keep its default. A managed variable
+cannot be overridden, so a repository's `.claude/settings.json` cannot point the flusher, and with it the
+credentials and everyone's buffered events, at another server. `CLAUDE_ANALYTICS_DISABLED` is left out so a
+person can still turn recording off.
+
+Each machine needs read access to this repository and `node` 18 or newer on the `PATH` that hooks run with.
 
 ## For Sandcastle agents
 
@@ -76,17 +92,18 @@ await sandcastle.run({
 
 ## Configuration
 
-Everything is set through environment variables. Set shared values through the `env` key of a settings file, as
-in the team example above, or in the real environment.
+Everything is set through environment variables: in the `env` key of a settings file or in the real environment.
+Credentials go only in managed settings, the real environment or `~/.claude/settings.json`, never in a repository's
+`.claude/settings.json`. An empty value counts as unset.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `CLAUDE_ANALYTICS_LOKI_URL` | `http://localhost:3100` | Loki base URL |
+| `CLAUDE_ANALYTICS_LOKI_URL` | `http://localhost:3100` | Loki base URL or push URL. Credentials go only to an `https` URL or to this machine, and never in the URL itself |
 | `CLAUDE_ANALYTICS_USER` | `git config user.email`, then OS user, then `unknown` | Identity tag (`user` label) |
 | `CLAUDE_ANALYTICS_SOURCE` | `dev` | `dev` or e.g. `sandcastle` (`source` label) |
 | `CLAUDE_ANALYTICS_PROJECT` | repo name of the `origin` remote, then git root folder name, then working folder name, then `unknown` | `project` label |
 | `CLAUDE_ANALYTICS_LOKI_TOKEN` / `_LOKI_BASIC_AUTH` / `_LOKI_TENANT` | – | Bearer token (wins over basic), `user:pass`, `X-Scope-OrgID` |
-| `CLAUDE_ANALYTICS_DIR` | `~/.claude/analytics` (temp dir if there is no home) | Data dir: where the event buffer lives |
+| `CLAUDE_ANALYTICS_DIR` | `~/.claude/analytics` (a per-user temp dir if there is no home) | Data dir: where the event buffer lives. Created readable by its owner only |
 | `CLAUDE_ANALYTICS_FLUSH_MS` / `_IDLE_EXIT_MS` | `1000` / `600000` | Flush interval, idle time before the flusher exits (values under 100 or non-numeric are ignored, with a log line) |
 | `CLAUDE_ANALYTICS_DISABLED` | – | `1`, `true` or `yes` turns recording off (anything else is logged and ignored) |
 

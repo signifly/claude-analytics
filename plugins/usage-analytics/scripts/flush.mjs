@@ -3,6 +3,7 @@
 // event buffer into Loki until idle; after releasing the lock it re-checks the
 // live file, so an event appended during shutdown is not stranded.
 // Spawned on demand by record.mjs; inherits the Loki settings of that session.
+import fs from "node:fs";
 import { loadConfig } from "./config.mjs";
 import { openBuffer } from "./event-buffer.mjs";
 import { drain } from "./drain.mjs";
@@ -11,6 +12,8 @@ import { createLog } from "./log.mjs";
 import { createLokiSink } from "./loki-sink.mjs";
 import { pruneSessions } from "./session-context.mjs";
 
+process.umask(0o077); // the buffer and log are the user's alone
+
 const config = loadConfig();
 const { log } = createLog(config.dataDir);
 
@@ -18,6 +21,9 @@ let lock = null;
 
 async function main() {
   const dir = config.dataDir;
+  // Versions before 0.4.3 created the default data dir world-readable. A configured
+  // dir is left alone: it may be shared on purpose.
+  if (!process.env.CLAUDE_ANALYTICS_DIR) fs.chmod(dir, 0o700, () => {});
   const buffer = openBuffer(dir, { log });
   const sink = createLokiSink({ ...config.loki, log });
 
