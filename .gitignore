@@ -7,3 +7,5 @@ node_modules/
 apps/docs/.next/
 apps/docs/next-env.d.ts
 *.tsbuildinfo
+.vercel
+.env*

@@ -32,6 +32,21 @@ Never point Cowork's export straight at Grafana Cloud. It sends full prompts and
 
 ## Run the bridge
 
+### On Vercel
+
+Signifly runs it as the Vercel project `claude-cowork-bridge` (team Signifly) at
+`https://claude-cowork-bridge.vercel.app`. `apps/cowork-bridge/api/otlp.mjs` is the function, and
+`apps/cowork-bridge/vercel.json` sends every path to it. The project settings that matter:
+
+- Root directory `apps/cowork-bridge`, with files outside it included, because the bridge imports the plugin's
+  sink and naming rules.
+- Function region `dub1`, next to the stack's Loki in eu-west.
+- The production environment variables from the table below. `PORT` is not used.
+
+Deploy from the repository root with `vercel deploy --prod --scope signifly`.
+
+### As a container
+
 Build the image from the repository root:
 
 ```sh
