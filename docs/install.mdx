@@ -47,6 +47,10 @@ into the repo's `.claude/settings.json`. The plugin is enabled for everyone once
 
 To make it mandatory across an organisation, put the same keys in managed settings.
 
+Keep Loki credentials out of this file: it is committed, often to a client's repository. Set
+`CLAUDE_ANALYTICS_LOKI_URL` and the credentials in managed settings or in each person's `~/.claude/settings.json`
+instead. For the company Grafana Cloud stack, see [On Grafana Cloud](./operating-the-stack.mdx#on-grafana-cloud).
+
 ## For Sandcastle agents
 
 Pass identity through the `env` option, so it exists before Claude Code starts:

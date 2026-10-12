@@ -1,6 +1,6 @@
 {
   "name": "usage-analytics",
   "description": "Ships Claude Code skill, slash-command and tool usage to Grafana Loki",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "author": { "name": "Signifly" }
 }

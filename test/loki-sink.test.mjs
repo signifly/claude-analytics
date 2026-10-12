@@ -108,3 +108,9 @@ test("a request that times out is retryable", async () => {
   const fetch = async () => { throw new DOMException("The operation was aborted due to timeout", "TimeoutError"); };
   await assert.rejects(createLokiSink({ url: "http://loki:3100", fetch }).push([event()]), /aborted due to timeout/);
 });
+
+test("a URL that already names the push endpoint, as Grafana Cloud shows it, is not extended again", async () => {
+  const loki = fakeLoki();
+  await createLokiSink({ url: "https://logs-prod-012.grafana.net/loki/api/v1/push/", fetch: loki.fetch }).push([event()]);
+  assert.equal(loki.requests[0].url, "https://logs-prod-012.grafana.net/loki/api/v1/push");
+});

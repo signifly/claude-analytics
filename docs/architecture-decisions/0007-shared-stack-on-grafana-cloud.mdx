@@ -1,0 +1,47 @@
+---
+title: ✅ Shared stack on the company Grafana Cloud
+description: Team usage events go to the Loki of Signifly's existing Grafana Cloud stack, with a write-only token per machine, instead of a self-hosted compose stack.
+---
+
+# 0007. Shared stack on the company Grafana Cloud
+
+Date: 2026-10-02
+Author: Emil Hørlyck
+
+## Status
+
+Accepted
+
+## Context
+
+Rolling the plugin out to the team needs a Loki that every developer machine and agent container can reach. The
+compose stack in `stack/` has no auth in front of Loki: exposed as is, anyone who can reach the port can read usage
+data and forge events. Self-hosting it for the team would mean adding an auth proxy, TLS, backups and someone on
+call for it.
+
+Signifly already pays for a Grafana Cloud stack. Its Loki has token auth, and the plugin can already send basic auth
+(`CLAUDE_ANALYTICS_LOKI_BASIC_AUTH`).
+
+## Decision
+
+The team's events go to the Loki of the company Grafana Cloud stack. The compose stack stays for local development
+and the smoke test.
+
+- Machines push with a Grafana Cloud access policy token that has only the `logs:write` scope. A leaked token can
+  add events but cannot read any.
+- The token is set in managed settings or in each person's `~/.claude/settings.json`, never in a repository's
+  `.claude/settings.json`. Client repositories must not carry it.
+- Usage events keep 90 days through a retention rule on `{service_name="claude-code-usage"}` alone, so the stack's
+  other logs keep their own retention.
+- The "Claude Code usage" dashboard is imported from `stack/grafana/dashboards/`. It picks its Loki through a
+  `datasource` variable, so the same JSON works locally and in Grafana Cloud.
+
+## Consequences
+
+- There is nothing to run or patch. Ingest volume is a few MB a month, well inside what the stack already pays for.
+- Everyone with read access to the stack's logs data source can see who used what. The identity tag defaults to the
+  git email, which is personal data. Limit who can read the stream, or set `CLAUDE_ANALYTICS_USER` to handles.
+- Grafana Cloud rejects samples older than 7 days. The plugin skips events older than 6 days, so a backlog that
+  arrives late is not rejected.
+- The dashboard in Grafana Cloud is a copy of the JSON in this repository. A change to the dashboard means
+  importing it again.

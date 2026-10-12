@@ -35,6 +35,44 @@ containers, set `BIND_ADDRESS=0.0.0.0`. Before you do:
 - keep the OTLP ports (4317/4318) on loopback or behind auth too. The collector has no auth and writes whatever it
   receives into Loki, Mimir and Tempo, so an open OTLP port gets around any auth in front of Loki.
 
+## On Grafana Cloud
+
+For a team, send events to the company's Grafana Cloud stack instead of exposing this one
+([ADR 0007](./architecture-decisions/0007-shared-stack-on-grafana-cloud.mdx)). An org admin does this once:
+
+1. In the Grafana Cloud portal, open the stack's **Loki** details. Note the URL (`https://logs-prod-NNN.grafana.net`)
+   and the numeric user ID.
+2. Create an access policy with only the `logs:write` scope, and a token for it. This is the token every machine
+   gets. It can add events but not read them.
+3. Under the stack's Loki settings, add a stream retention rule of 90 days (`2160h`) for
+   `{service_name="claude-code-usage"}`. The default is 30 days.
+4. In the stack's Grafana, go to **Dashboards → New → Import** and upload
+   `stack/grafana/dashboards/claude-code-usage.json`. In the **Loki** variable, pick `grafanacloud-<stack>-logs`
+   and save the dashboard.
+5. Decide who may read the data. Anyone who can query the logs data source can see each person's usage (see
+   [Install](./install.mdx#configuration) about the identity tag).
+
+Each machine then needs these three variables, through managed settings or `~/.claude/settings.json` (never a
+repository's `.claude/settings.json`):
+
+```json
+{
+  "env": {
+    "CLAUDE_ANALYTICS_LOKI_URL": "https://logs-prod-NNN.grafana.net",
+    "CLAUDE_ANALYTICS_LOKI_BASIC_AUTH": "<user id>:<logs:write token>"
+  }
+}
+```
+
+Then restart every open Claude Code session and stop the running flusher with
+`pkill -f usage-analytics/scripts/flush.mjs`. A flusher keeps the URL it started with, and it stays alive while
+events keep arriving. Held events are not lost: the next flusher sends them.
+
+The URL may also be the full push URL (`.../loki/api/v1/push`). To check a machine, run any slash command in
+Claude Code, then query `{service_name="claude-code-usage"}` in the stack's Explore. If nothing arrives, a
+`401`/`403` in the plugin's log means the user ID or token is wrong (see
+[Troubleshooting](./how-it-works.mdx#troubleshooting)).
+
 ## Retention
 
 | Store | Keeps | Set in |
