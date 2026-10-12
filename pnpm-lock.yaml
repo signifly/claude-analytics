@@ -16,6 +16,8 @@ importers:
         specifier: 2.11.2
         version: 2.11.2
 
+  apps/cowork-bridge: {}
+
   apps/docs:
     dependencies:
       fumadocs-core:

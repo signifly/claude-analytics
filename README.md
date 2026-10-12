@@ -29,6 +29,7 @@ claude plugin install usage-analytics@claude-analytics      # needs node >= 18 (
 | [What it is](docs/index.mdx) | What claude-analytics does and how the parts fit |
 | [Install](docs/install.mdx) | Installing for yourself, a team repo, an organisation or an agent; every configuration variable |
 | [What is recorded](docs/what-is-recorded.mdx) | The fields of a usage event, its kinds, and how it looks in Loki |
+| [Cowork](docs/cowork.mdx) | Recording Cowork usage through the Cowork bridge, and why chat is not covered |
 | [How it works](docs/how-it-works.mdx) | Hooks, the event buffer, the flusher, failures, the modules, troubleshooting |
 | [Operating the stack](docs/operating-the-stack.mdx) | Ports, serving a team safely, retention, the dashboard, native telemetry |
 | [Architecture decisions](docs/architecture-decisions/) | Why it was built this way |

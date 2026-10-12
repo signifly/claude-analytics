@@ -1,0 +1,66 @@
+---
+title: ✅ Cowork through a name-only bridge
+description: Cowork's OpenTelemetry export goes to a small bridge we run, which keeps only names and pushes them as ordinary usage events with source "cowork". Chat is out of reach on the Team plan.
+---
+
+# 0008. Cowork through a name-only bridge
+
+Date: 2026-10-12
+Author: Emil Hørlyck
+
+## Status
+
+Accepted
+
+## Context
+
+The goal is one dashboard of what people use across Claude: skills, MCP tools and built-in tools, in Claude Code,
+Cowork and chat. Claude Code is covered by the plugin. The other two cannot run it.
+
+Cowork can export OpenTelemetry events (Admin settings → Data and privacy → Monitoring). On 2026-10-12 that export
+was pointed straight at Grafana Cloud. It sent colleagues' full prompts and tool inputs, which ADR 0003 forbids
+storing. The export was switched off, its token revoked and the data deleted. Cowork's cloud sessions run on
+Anthropic's servers, so no setting on our machines can turn that content off. Whatever receives the export must
+drop the content itself, and it must be reachable from the internet.
+
+The events do carry what we need. `skill_activated` names the skill and says whether the person typed it.
+`tool_result` names the tool. For an MCP tool, `tool_name` is the literal `mcp_tool`, and the server and tool
+names are inside `tool_parameters`. That is a JSON string that can also hold command lines and arguments. Every
+event has `user.email`, the person's claude.ai login.
+
+Chat (claude.ai and the desktop app's chat) has no export. On Enterprise, the Analytics API reports skill and
+connector use per person per day. Signifly is on the Team plan, where that API is not available.
+
+## Decision
+
+- A **Cowork bridge** (`apps/cowork-bridge/`) receives Cowork's OTLP/HTTP export in its JSON encoding. It builds
+  each usage event from scratch out of a fixed list of attributes. From `tool_parameters` it reads only the two
+  MCP names and the subagent type. Everything else is dropped in memory and never logged.
+- Its events are ordinary usage events in the same stream as the plugin's, with `source` = `cowork` and `project`
+  = `unknown`. The dashboard, its queries and its filters work for both without changes. It pushes through the
+  plugin's Loki sink with its own `logs:write` token.
+- The mapping follows the plugin's meaning of each kind:
+  - A skill Claude activates is a `skill`; one the person typed is a `command`.
+  - Each prompt is a `prompt`.
+  - `tool_result` becomes `tool`, `mcp` or `agent`. The `Skill` tool and `tool_decision` are not counted, because
+    they would count the same use twice.
+  - An MCP call whose names were redacted is still counted, as `mcp_tool`.
+- Cowork authenticates with a long bearer token in the export's headers. The bridge accepts only `http/json`.
+  Protobuf would need a decoder dependency, and Cowork offers JSON.
+- The **identity tag** is the work email on every surface. Cowork sends it. For Claude Code, the Iru profile sets
+  `CLAUDE_ANALYTICS_USER` to `$EMAIL`, the assigned user's email, instead of relying on each person's git email.
+- **Chat is out of scope** while Signifly is on the Team plan. An importer for the Enterprise Analytics API is
+  deferred until then.
+
+## Consequences
+
+- No content leaves the bridge. It is tested with requests full of marked content, and none of it reaches an event.
+- Someone has to run the bridge: one small container with a public HTTPS address. If it is down, Cowork's exporter
+  retries for a while and then drops events. The plugin's local buffer has no equivalent here.
+- `source` now means two things: who is working (`dev`, `sandcastle`) and on which surface (`cowork`). A separate
+  `surface` label would keep them apart, but it would add a stream label and change every plugin's streams. It can
+  be split out later if the dashboard needs it.
+- Cowork events have no project. Per-project panels show them as `unknown`.
+- If Anthropic renames these events or attributes, Cowork usage quietly stops showing up. A dashboard that suddenly
+  shows no Cowork events is the signal to check.
+- The data still includes `prompt` counts per person. Who may read the stream is still to be decided (ADR 0007).

@@ -1,0 +1,78 @@
+---
+title: Cowork
+description: Recording Cowork usage through the Cowork bridge, which keeps names and drops content before anything is stored.
+---
+
+# Cowork
+
+Cowork sessions can't run the plugin. Instead, Cowork's own OpenTelemetry export goes to the **Cowork bridge**
+(`apps/cowork-bridge/`). The bridge turns each event into an ordinary usage event with `source` = `cowork` and
+drops everything else, prompts and tool inputs included. The reasoning is in
+[ADR 0008](./architecture-decisions/0008-cowork-through-a-name-only-bridge.mdx).
+
+```
+Cowork (Anthropic cloud) ──OTLP http/json + bearer──▶ Cowork bridge ──names only──▶ Loki ──▶ Grafana
+```
+
+Never point Cowork's export straight at Grafana Cloud. It sends full prompts and tool inputs.
+
+## What is recorded
+
+| Cowork event | Usage event |
+|---|---|
+| `skill_activated`, triggered by Claude | `skill`, the skill name |
+| `skill_activated`, typed by the person (`user-slash`) | `command`, the skill name |
+| `user_prompt` | `prompt` (the text is never kept) |
+| `tool_result` for an MCP tool | `mcp`, `mcp__<server>__<tool>` from the names in `tool_parameters`, or `mcp_tool` if they were redacted |
+| `tool_result` for `Agent`/`Task` | `agent`, the subagent type |
+| any other `tool_result` | `tool`, the tool name |
+| everything else, including `tool_decision` and the `Skill` tool | nothing |
+
+`user` is the person's claude.ai email, lowercased. `project` is `unknown`. `session_id` is Cowork's session id.
+
+## Run the bridge
+
+Build the image from the repository root:
+
+```sh
+docker build -f apps/cowork-bridge/Dockerfile -t cowork-bridge .
+```
+
+It needs a public HTTPS address in front of port `4318`. Configure it with:
+
+| Variable | Purpose |
+|---|---|
+| `COWORK_BRIDGE_TOKEN` | The secret Cowork sends as `Authorization: Bearer …`. At least 32 characters, for example `openssl rand -hex 32` |
+| `CLAUDE_ANALYTICS_LOKI_URL` | The stack's Loki URL, as for the plugin |
+| `CLAUDE_ANALYTICS_LOKI_BASIC_AUTH` | `<user id>:<token>`, where the token has only `logs:write`. Use a token of its own, not the one the machines use |
+| `PORT` | Defaults to `4318` |
+
+`GET /healthz` answers `ok` without a token. The bridge logs one line per refused request or failed push, never
+any request content.
+
+## Point Cowork at it
+
+In claude.ai, go to **Admin settings → Data and privacy → Monitoring**:
+
+- **OTLP endpoint**: the bridge's base URL, for example `https://cowork-bridge.example.com`. The exporter adds
+  `/v1/logs`.
+- **OTLP protocol**: `http/json`. The bridge refuses protobuf with a `415`.
+- **OTLP headers**: `Authorization=Bearer <COWORK_BRIDGE_TOKEN>`.
+
+The setting only applies to Cowork sessions started after you save it.
+
+## Check it
+
+Start a new Cowork task that uses a skill or a connector, then query:
+
+```text
+{service_name="claude-code-usage", source="cowork"} | json
+```
+
+If nothing arrives, the bridge's log says whether requests were refused (`401` means the token is wrong, `415`
+means the protocol is not `http/json`) or the push to Loki failed.
+
+## Chat
+
+Claude chat, on the web and in the desktop app, has no usage export on the Team plan. On Enterprise, the Analytics
+API reports skill and connector use per person per day. Importing it is deferred.

@@ -65,6 +65,10 @@ cannot be overridden, so a repository's `.claude/settings.json` cannot point the
 credentials and everyone's buffered events, at another server. `CLAUDE_ANALYTICS_DISABLED` is left out so a
 person can still turn recording off.
 
+In an Iru profile, set `CLAUDE_ANALYTICS_USER` to `$EMAIL`. Iru fills in the email of the device's assigned user,
+so every machine reports the same work email that Cowork reports ([ADR 0008](./architecture-decisions/0008-cowork-through-a-name-only-bridge.mdx)),
+whatever the person's git email is.
+
 Each machine needs `node` 18 or newer. The hooks also look in `/usr/local/bin` (the nodejs.org installer) and
 `/opt/homebrew/bin`, because the desktop app opened from the Dock does not get the shell's `PATH`.
 
@@ -101,7 +105,7 @@ Credentials go only in managed settings, the real environment or `~/.claude/sett
 |---|---|---|
 | `CLAUDE_ANALYTICS_LOKI_URL` | `http://localhost:3100` | Loki base URL or push URL. Credentials go only to an `https` URL or to this machine, and never in the URL itself |
 | `CLAUDE_ANALYTICS_USER` | `git config user.email`, then OS user, then `unknown` | Identity tag (`user` label) |
-| `CLAUDE_ANALYTICS_SOURCE` | `dev` | `dev` or e.g. `sandcastle` (`source` label) |
+| `CLAUDE_ANALYTICS_SOURCE` | `dev` | `dev` or e.g. `sandcastle` (`source` label). `cowork` is used by the [Cowork bridge](./cowork.mdx) |
 | `CLAUDE_ANALYTICS_PROJECT` | repo name of the `origin` remote, then git root folder name, then working folder name, then `unknown` | `project` label |
 | `CLAUDE_ANALYTICS_LOKI_TOKEN` / `_LOKI_BASIC_AUTH` / `_LOKI_TENANT` | – | Bearer token (wins over basic), `user:pass`, `X-Scope-OrgID` |
 | `CLAUDE_ANALYTICS_DIR` | `~/.claude/analytics` (a per-user temp dir if there is no home) | Data dir: where the event buffer lives. Created readable by its owner only |
