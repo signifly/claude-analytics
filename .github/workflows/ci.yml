@@ -50,6 +50,8 @@ jobs:
       - name: Plugin and marketplace manifests validate
         run: npx -y @anthropic-ai/claude-code@2.1.277 plugin validate . # pinned: bump deliberately
       - run: docker compose config -q
+      - name: Cowork bridge image builds
+        run: docker build -q -f apps/cowork-bridge/Dockerfile -t cowork-bridge .
       - name: Start Loki
         run: |
           docker compose up -d loki

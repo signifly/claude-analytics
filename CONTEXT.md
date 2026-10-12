@@ -14,9 +14,11 @@ Domain language for claude-analytics. Use these terms exactly in code, tests, do
 
 **Session context** — who and where a session is: `user`, `project`, `source`. Resolved once per session and cached.
 
-**Identity tag** — the `user` value. `CLAUDE_ANALYTICS_USER` if set, else git email, else OS user, else `unknown`.
+**Identity tag** — the `user` value: the person's work email on every surface. In Claude Code, `CLAUDE_ANALYTICS_USER` if set (the Iru profile sets it to the assigned user's email), else git email, else OS user, else `unknown`. In Cowork, the claude.ai login email.
 
-**Source** — what kind of session produced the event: `dev` (a person) or e.g. `sandcastle` (an autonomous agent).
+**Source** — what kind of session produced the event: `dev` (a person in Claude Code), e.g. `sandcastle` (an autonomous agent), or `cowork` (a Cowork session, via the Cowork bridge).
+
+**Cowork bridge** — the service that receives Cowork's OpenTelemetry export and turns it into usage events, keeping names only. Cowork can't run the plugin.
 
 **Data dir** — the folder that holds one event buffer together with its flusher lock, cached session contexts and log. Each machine or container has its own; never shared between them.
 

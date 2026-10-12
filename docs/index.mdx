@@ -20,6 +20,8 @@ file paths never leave the machine; the project is identified by the repo or fol
   waits on analytics, and an unreachable Loki never disturbs one.
 - **The stack** (`docker-compose.yml` and `stack/`) runs Loki, Grafana, Tempo, Mimir and an OpenTelemetry
   collector, with a provisioned "Claude Code usage" dashboard.
+- **The Cowork bridge** (`apps/cowork-bridge/`) receives Cowork's OpenTelemetry export and passes on only the
+  names of what was used, as usage events with `source` = `cowork`. See [Cowork](./cowork.mdx).
 
 ```
 Claude Code hooks ──append──▶ ~/.claude/analytics/events.jsonl ──flusher (1s batches)──▶ Loki ──▶ Grafana

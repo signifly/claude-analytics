@@ -1,0 +1,11 @@
+{
+  "name": "cowork-bridge",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "check": "for f in *.mjs; do node --check \"$f\" || exit 1; done",
+    "start": "node main.mjs"
+  }
+}

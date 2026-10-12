@@ -846,7 +846,7 @@
     {
       "id": 15,
       "type": "bargauge",
-      "title": "Dev sessions vs. Sandcastle agents",
+      "title": "Events by source (dev, Sandcastle, Cowork)",
       "datasource": {
         "type": "loki",
         "uid": "${datasource}"
