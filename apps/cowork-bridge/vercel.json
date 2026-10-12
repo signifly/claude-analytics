@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo no dependencies",
+  "buildCommand": "",
+  "outputDirectory": "public",
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/otlp" }]
+}
