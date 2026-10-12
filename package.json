@@ -1,5 +1,6 @@
 {
   "name": "claude-analytics",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.34.5",
