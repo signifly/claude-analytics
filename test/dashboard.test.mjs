@@ -24,4 +24,14 @@ test("the Loki picker leaves out Grafana Cloud's internal Loki data sources", ()
   assert.ok(offered("grafanacloud-signifly-logs"));
   assert.ok(!offered("grafanacloud-signifly-alert-state-history"));
   assert.ok(!offered("grafanacloud-signifly-usage-insights"));
+  // Grafana 13 matches the regex against the uid too, which has no stack name in it.
+  assert.ok(offered("grafanacloud-logs"));
+  assert.ok(!offered("grafanacloud-alert-state-history"));
+  assert.ok(!offered("grafanacloud-usage-insights"));
+});
+
+test("every bar gauge draws one bar per row, so one table frame (Grafana 13's Loki) shows every value, not the last", () => {
+  const gauges = dashboard.panels.filter((panel) => panel.type === "bargauge");
+  assert.ok(gauges.length > 0);
+  for (const panel of gauges) assert.equal(panel.options.reduceOptions.values, true, panel.title);
 });

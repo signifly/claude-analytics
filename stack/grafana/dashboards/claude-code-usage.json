@@ -23,7 +23,7 @@
         "current": {},
         "refresh": 1,
         "hide": 0,
-        "regex": "/^(?!grafanacloud-.*-(alert-state-history|usage-insights)$).*/"
+        "regex": "/^(?!grafanacloud-(.*-)?(alert-state-history|usage-insights)$).*/"
       },
       {
         "name": "user",
@@ -481,11 +481,9 @@
         "showUnfilled": true,
         "namePlacement": "left",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": [],
           "fields": "",
-          "values": false
+          "values": true
         }
       },
       "fieldConfig": {
@@ -538,11 +536,9 @@
         "showUnfilled": true,
         "namePlacement": "left",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": [],
           "fields": "",
-          "values": false
+          "values": true
         }
       },
       "fieldConfig": {
@@ -595,11 +591,9 @@
         "showUnfilled": true,
         "namePlacement": "left",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": [],
           "fields": "",
-          "values": false
+          "values": true
         }
       },
       "fieldConfig": {
@@ -717,11 +711,9 @@
         "showUnfilled": true,
         "namePlacement": "left",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": [],
           "fields": "",
-          "values": false
+          "values": true
         }
       },
       "fieldConfig": {
@@ -774,11 +766,9 @@
         "showUnfilled": true,
         "namePlacement": "left",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": [],
           "fields": "",
-          "values": false
+          "values": true
         }
       },
       "fieldConfig": {
@@ -831,11 +821,9 @@
         "showUnfilled": true,
         "namePlacement": "left",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": [],
           "fields": "",
-          "values": false
+          "values": true
         }
       },
       "fieldConfig": {
@@ -888,11 +876,9 @@
         "showUnfilled": true,
         "namePlacement": "left",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": [],
           "fields": "",
-          "values": false
+          "values": true
         }
       },
       "fieldConfig": {
