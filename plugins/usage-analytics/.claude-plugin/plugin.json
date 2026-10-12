@@ -2,6 +2,6 @@
   "name": "usage-analytics",
   "license": "MIT",
   "description": "Ships Claude Code skill, slash-command and tool usage to Grafana Loki",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "author": { "name": "Signifly" }
 }
