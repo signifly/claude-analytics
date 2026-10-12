@@ -6,7 +6,7 @@ description: Add the usage-analytics plugin for one developer, a whole team repo
 # Install
 
 The plugin needs `node` 18 or newer on the machine or container that runs Claude Code, on the `PATH` that hooks
-run with. It has no other dependencies. Events go to a Loki; to run one locally, see
+run with or in `/usr/local/bin` or `/opt/homebrew/bin`. It has no other dependencies. Events go to a Loki; to run one locally, see
 [Operating the stack](./operating-the-stack.mdx).
 
 ## For yourself
@@ -65,7 +65,8 @@ cannot be overridden, so a repository's `.claude/settings.json` cannot point the
 credentials and everyone's buffered events, at another server. `CLAUDE_ANALYTICS_DISABLED` is left out so a
 person can still turn recording off.
 
-Each machine needs read access to this repository and `node` 18 or newer on the `PATH` that hooks run with.
+Each machine needs `node` 18 or newer. The hooks also look in `/usr/local/bin` (the nodejs.org installer) and
+`/opt/homebrew/bin`, because the desktop app opened from the Dock does not get the shell's `PATH`.
 
 ## For Sandcastle agents
 

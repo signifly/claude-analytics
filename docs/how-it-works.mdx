@@ -108,5 +108,6 @@ sink, and the Loki adapter against an injected `fetch`.
   back to `$TMPDIR/claude-analytics.log`, with the same cap. Most hook-side messages are limited to one per kind
   per hour.
 - Leftover `batch-*.jsonl` files mean Loki was unreachable or misconfigured. The next flusher retries them.
-- Nothing arriving and no log at all usually means `node` is not on the `PATH` that Claude Code hooks run with.
+- Nothing arriving and no log at all usually means the hooks cannot find `node`: it is not on the `PATH` Claude Code runs with, nor in `/usr/local/bin`
+  or `/opt/homebrew/bin`.
   It can also mean `CLAUDE_ANALYTICS_DISABLED` is set, or a half-updated plugin whose modules fail to load.
