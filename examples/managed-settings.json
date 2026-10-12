@@ -1,0 +1,23 @@
+{
+  "extraKnownMarketplaces": {
+    "claude-analytics": {
+      "source": { "source": "github", "repo": "signifly/claude-analytics" },
+      "autoUpdate": true
+    }
+  },
+  "enabledPlugins": {
+    "usage-analytics@claude-analytics": true
+  },
+  "env": {
+    "CLAUDE_ANALYTICS_LOKI_URL": "https://logs-prod-NNN.grafana.net",
+    "CLAUDE_ANALYTICS_LOKI_BASIC_AUTH": "<loki user id>:<logs:write token>",
+    "CLAUDE_ANALYTICS_LOKI_TOKEN": "",
+    "CLAUDE_ANALYTICS_LOKI_TENANT": "",
+    "CLAUDE_ANALYTICS_USER": "",
+    "CLAUDE_ANALYTICS_PROJECT": "",
+    "CLAUDE_ANALYTICS_SOURCE": "dev",
+    "CLAUDE_ANALYTICS_DIR": "",
+    "CLAUDE_ANALYTICS_FLUSH_MS": "",
+    "CLAUDE_ANALYTICS_IDLE_EXIT_MS": ""
+  }
+}

@@ -28,12 +28,15 @@ Tempo and Mimir are not published; Grafana and the collector reach them inside t
 By default, all ports are published on **127.0.0.1 only**. To make the stack reachable from other machines or
 containers, set `BIND_ADDRESS=0.0.0.0`. Before you do:
 
-- set a real admin password with `GRAFANA_ADMIN_PASSWORD`;
+- set a real admin password with `GRAFANA_ADMIN_PASSWORD`. Grafana reads it on first start only: on a stack that has
+  already run, it is still `admin` until you run
+  `docker compose exec grafana grafana cli admin reset-admin-password <password>`;
 - set `GRAFANA_ANONYMOUS=false`, since anonymous viewers are on by default;
 - put Loki behind auth. It has none of its own. The plugin's flusher can send a bearer token, basic auth and a
   tenant header (see [Install](./install.mdx#configuration));
 - keep the OTLP ports (4317/4318) on loopback or behind auth too. The collector has no auth and writes whatever it
-  receives into Loki, Mimir and Tempo, so an open OTLP port gets around any auth in front of Loki.
+  receives into Loki, Mimir and Tempo, so an open OTLP port gets around any auth in front of Loki;
+- don't count on the host firewall: ports Docker publishes bypass ufw and firewalld.
 
 ## On Grafana Cloud
 
