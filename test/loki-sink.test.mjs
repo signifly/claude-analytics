@@ -111,6 +111,13 @@ test("a request that times out is retryable", async () => {
 
 test("a URL that already names the push endpoint, as Grafana Cloud shows it, is not extended again", async () => {
   const loki = fakeLoki();
-  await createLokiSink({ url: "https://logs-prod-012.grafana.net/loki/api/v1/push/", fetch: loki.fetch }).push([event()]);
-  assert.equal(loki.requests[0].url, "https://logs-prod-012.grafana.net/loki/api/v1/push");
+  await createLokiSink({ url: "https://logs-prod-NNN.grafana.net/loki/api/v1/push/", fetch: loki.fetch }).push([event()]);
+  assert.equal(loki.requests[0].url, "https://logs-prod-NNN.grafana.net/loki/api/v1/push");
+});
+
+test("a redirect is not followed, so credentials never go to a host they were not set for", async () => {
+  let init;
+  const fetch = async (url, options) => { init = options; return { ok: true, status: 204, text: async () => "" }; };
+  await createLokiSink({ url: "https://logs.example.net", basicAuth: "u:p", fetch }).push([event()]);
+  assert.equal(init.redirect, "error");
 });

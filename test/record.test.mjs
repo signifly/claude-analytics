@@ -101,7 +101,7 @@ test("with no home, the buffer and the log land in the temp dir the hook was giv
   const result = runHook(payload(), { HOME: "", CLAUDE_ANALYTICS_DIR: "" });
   silent(result);
   assert.ok(result.tmp, "runHook must give every hook its own TMPDIR");
-  const fallbackDir = path.join(result.tmp, "claude-analytics");
+  const fallbackDir = path.join(result.tmp, `claude-analytics-${process.getuid?.() ?? "user"}`);
   const held = fs.readdirSync(fallbackDir).filter((f) => f === "events.jsonl" || f.startsWith("batch-"));
   assert.equal(held.length, 1);
   assert.match(fs.readFileSync(path.join(fallbackDir, held[0]), "utf8"), /"user":"test"/);
@@ -131,5 +131,23 @@ test("with a read-only data dir, hook events start at most one doomed flusher pe
     assert.equal(lockErrors(), 1, fs.readFileSync(path.join(tmp, "claude-analytics.log"), "utf8"));
   } finally {
     fs.chmodSync(dir, 0o755);
+  }
+});
+
+test("a payload that is not JSON is logged without any of its text", () => {
+  const dir = tmpDir();
+  silent(runHook("SECRET-PROMPT and more", { CLAUDE_ANALYTICS_DIR: dir }));
+  const log = fs.readFileSync(path.join(dir, "flusher.log"), "utf8");
+  assert.match(log, /unreadable hook payload/);
+  assert.ok(!log.includes("SECRET"), log);
+});
+
+test("the data dir and the files in it are private to the user", { skip: process.platform === "win32" && "no POSIX modes" }, () => {
+  const dir = path.join(tmpDir(), "analytics");
+  silent(runHook(payload(), { CLAUDE_ANALYTICS_DIR: dir }));
+  assert.equal(fs.statSync(dir).mode & 0o777, 0o700);
+  for (const name of fs.readdirSync(dir)) {
+    const info = fs.statSync(path.join(dir, name));
+    assert.equal(info.mode & 0o077, 0, `${name} is ${(info.mode & 0o777).toString(8)}`);
   }
 });

@@ -36,8 +36,14 @@ for (const [remote, project] of [
   ["https://github.com/signifly/webshop.git/", "webshop"],
   ["ssh://git@host:2222/signifly/web.shop.git", "web.shop"],
   ["https://user:s3cr3t-t0ken@github.com/signifly/webshop.git", "webshop"],
+  ["https://gitlab.com/group/webshop.git?private_token=s3cr3t", "webshop"],
+  ["https://gitlab.com/group/webshop.git#s3cr3t", "webshop"],
+  ["/srv/git/webshop.git", "webshop"],
+  // No repository name in the URL: the project falls back to the working folder (/work/webshop).
+  ["https://user:s3cr3t@github.com", "webshop"],
+  ["https://github.com/s3cr3t%20x", "webshop"],
 ]) {
-  test(`the project of ${remote.replace(/:[^:@/]+@/, ":***@")} is ${project}, and nothing else from the URL is kept`, () => {
+  test(`the project of ${remote.replace(/:[^:@/]+@/, ":***@").replace(/s3cr3t\S*/, "***")} is ${project}, and nothing else from the URL is kept`, () => {
     const context = resolve({ exec: fakeGit({ remote }) });
     assert.equal(context.project, project);
     assert.ok(!JSON.stringify(context).includes("s3cr3t"));

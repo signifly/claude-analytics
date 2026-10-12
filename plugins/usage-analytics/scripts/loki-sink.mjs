@@ -40,6 +40,7 @@ export function createLokiSink({ url, token, basicAuth, tenant, fetch = globalTh
           method: "POST",
           headers,
           body: JSON.stringify({ streams: [...streams.values()] }),
+          redirect: "error", // a redirect would carry the Authorization header to another host
           signal: AbortSignal.timeout(10_000),
         });
       } catch (err) {
