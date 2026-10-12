@@ -11,3 +11,7 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      # fumadocs-mdx and -ui pin the fumadocs-core they work with: bumped alone, the docs build breaks.
+      fumadocs:
+        patterns: ["fumadocs-*"]
