@@ -12,6 +12,6 @@
     "test:root": "node --test test/*.test.mjs"
   },
   "devDependencies": {
-    "turbo": "2.11.2"
+    "turbo": "2.11.7"
   }
 }
